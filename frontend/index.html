@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Energy Tracker</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+    <header class="app-header">
+        <h1>Energy Tracker</h1>
+        <nav id="main-nav" class="hidden">
+            <button id="nav-dashboard" class="active">Dashboard</button>
+            <button id="nav-add">Add Month</button>
+            <button id="nav-settings">Settings</button>
+        </nav>
+    </header>
+
+    <main id="app-container">
+        <!-- Dynamic Content Here -->
+        <div id="loading">Loading...</div>
+    </main>
+
+    <script type="module" src="/static/js/main.js"></script>
+</body>
+
+</html>
