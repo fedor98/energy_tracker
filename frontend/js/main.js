@@ -9,31 +9,55 @@ const navDashboard = document.getElementById('nav-dashboard');
 const navAdd = document.getElementById('nav-add');
 const navSettings = document.getElementById('nav-settings'); // Not really a view, maybe just Setup again or Reset logic?
 
-// Simple Router
-async function navigate(view) {
-    appContainer.innerHTML = '<div id="loading">Loading...</div>';
+// Router
+const routes = {
+    '/': { view: 'dashboard', render: DashboardView.render, navId: 'nav-dashboard' },
+    '/add': {
+        view: 'add', render: async (container) => {
+            await AddReadingView.render(container, () => navigateTo('/'));
+        }, navId: 'nav-add'
+    },
+    '/settings': {
+        view: 'settings', render: async (container) => {
+            // Reuse setup for now or create distinct settings view later
+            // For now, let's just show a simple message or reuse setup
+            appContainer.innerHTML = '<h2>Settings</h2><p>Settings view implementation pending.</p>';
+        }, navId: 'nav-settings'
+    },
+    '/setup': {
+        view: 'setup', render: async (container) => {
+            nav.classList.add('hidden');
+            await SetupView.render(container, () => {
+                window.location.reload();
+            });
+        }, navId: ''
+    }
+};
 
-    // Reset Nav
+async function router() {
+    const path = window.location.pathname;
+    const route = routes[path] || routes['/'];
+
+    // reset nav
     [navDashboard, navAdd, navSettings].forEach(b => b.classList.remove('active'));
 
-    if (view === 'setup') {
-        nav.classList.add('hidden'); // Hide nav during setup
-        await SetupView.render(appContainer, () => {
-            // On success
-            window.location.reload();
-        });
-    } else if (view === 'dashboard') {
+    if (route.navId) {
+        const navEl = document.getElementById(route.navId);
+        if (navEl) navEl.classList.add('active');
         nav.classList.remove('hidden');
-        navDashboard.classList.add('active');
-        await DashboardView.render(appContainer);
-    } else if (view === 'add') {
-        nav.classList.remove('hidden');
-        navAdd.classList.add('active');
-        await AddReadingView.render(appContainer, () => {
-            navigate('dashboard');
-        });
     }
+
+    appContainer.innerHTML = '<div id="loading">Loading...</div>';
+
+    await route.render(appContainer);
 }
+
+function navigateTo(url) {
+    history.pushState(null, null, url);
+    router();
+}
+
+window.addEventListener('popstate', router);
 
 // Initial Load
 async function init() {
@@ -41,10 +65,14 @@ async function init() {
         const config = await getConfig();
         if (!config || (config.gas.rooms.length === 0 && config.water.length === 0 && config.electricity.meters.length === 0)) {
             // Not setup
-            navigate('setup');
+            if (window.location.pathname !== '/setup') {
+                navigateTo('/setup');
+            } else {
+                router();
+            }
         } else {
             // Setup done
-            navigate('dashboard');
+            router();
         }
     } catch (e) {
         appContainer.innerHTML = `<p class="error">Failed to load configuration. Is the server running? (${e.message})</p>`;
@@ -52,14 +80,8 @@ async function init() {
 }
 
 // Event Listeners
-navDashboard.addEventListener('click', () => navigate('dashboard'));
-navAdd.addEventListener('click', () => navigate('add'));
-navSettings.addEventListener('click', () => {
-    // For now, re-use setup as a "Settings" view or just alert
-    // The prompt asked for "Neuinitialisierung" which is handled in Dashboard reset.
-    // Maybe Settings just shows the Config?
-    // Let's just alert for now or direct to Dashboard
-    alert("To reset the application, use the 'Reset App Data' button in the Dashboard.");
-});
+navDashboard.addEventListener('click', () => navigateTo('/'));
+navAdd.addEventListener('click', () => navigateTo('/add'));
+navSettings.addEventListener('click', () => navigateTo('/settings'));
 
 init();

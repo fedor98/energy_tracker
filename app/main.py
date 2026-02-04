@@ -26,5 +26,7 @@ app.mount("/static", StaticFiles(directory="frontend"), name="static")
 async def read_index():
     return FileResponse('frontend/index.html')
 
-# Catch-all for SPA routing (if strict routing is on, but we mostly use hash routing or single view)
-# For now, just / serves index.
+# Catch-all for SPA routing
+@app.get("/{full_path:path}")
+async def read_index(full_path: str):
+    return FileResponse('frontend/index.html')
