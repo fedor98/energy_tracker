@@ -130,7 +130,8 @@ export async function render(container, onComplete) {
     async function save() {
         try {
             await initConfig(state);
-            onComplete();
+            alert('Setup successfully completed!');
+            window.router.navigate('/');
         } catch (e) {
             alert('Error saving setup: ' + e.message);
         }
