@@ -39,9 +39,9 @@ export async function render(container) {
         <div class="card">
             <div class="dashboard-tabs">
                 <button class="btn-secondary active" id="tab-consumption">Consumption 📈</button>
-                <button class="btn-secondary" id="tab-electricity"><span class="tab-label">Electricity</span> ⚡️</button>
-                <button class="btn-secondary" id="tab-water"><span class="tab-label">Water</span> 💧</button>
-                <button class="btn-secondary" id="tab-gas"><span class="tab-label">Gas</span> 💨</button>
+                <button class="btn-secondary" id="tab-electricity">Electricity ⚡️</button>
+                <button class="btn-secondary" id="tab-water">Water 💧</button>
+                <button class="btn-secondary" id="tab-gas">Gas 💨</button>
             </div>
             <div id="view-toggle-wrapper" style="display: none;">
                 <div class="view-toggle-container">
@@ -75,12 +75,16 @@ export async function render(container) {
     let currentTab = 'consumption';
 
     tabs.forEach(t => {
-        container.querySelector(`#tab-${t}`).addEventListener('click', (e) => {
-            // Update UI
-            tabs.forEach(x => container.querySelector(`#tab-${x}`).classList.remove('active', 'btn-primary'));
-            tabs.forEach(x => container.querySelector(`#tab-${x}`).classList.add('btn-secondary'));
-            e.target.classList.remove('btn-secondary');
-            e.target.classList.add('btn-primary', 'active');
+        const tabBtn = container.querySelector(`#tab-${t}`);
+        tabBtn.addEventListener('click', () => {
+            // Update UI - use the button element directly
+            tabs.forEach(x => {
+                const btn = container.querySelector(`#tab-${x}`);
+                btn.classList.remove('active', 'btn-primary');
+                btn.classList.add('btn-secondary');
+            });
+            tabBtn.classList.remove('btn-secondary');
+            tabBtn.classList.add('btn-primary', 'active');
 
             currentTab = t;
             
