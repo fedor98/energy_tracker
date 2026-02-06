@@ -27,27 +27,85 @@ class AppConfig(BaseModel):
             electricity=ElectricityConfig(meters=[])
         )
 
-# Reading Models
+# Legacy Reading Model (for compatibility during transition)
 class ReadingInput(BaseModel):
     period: str  # YYYY-MM
-    date: Optional[str] = None # YYYY-MM-DD
+    date: Optional[str] = None  # YYYY-MM-DD
     type: Literal["electricity", "water", "gas"]
-    meter: str # Room name or Meter name
-    channel: Optional[str] = None # "warm", "cold", or None
+    meter: str  # Room name or Meter name
+    channel: Optional[str] = None  # "warm", "cold", or None
     value: float
 
 class ReadingItem(ReadingInput):
     id: int
-    
+
+# New Separate Reading Models
+class ElectricityReadingInput(BaseModel):
+    period: str  # YYYY-MM
+    date: Optional[str] = None  # YYYY-MM-DD
+    meter_name: str
+    value: float
+
+class ElectricityReading(ElectricityReadingInput):
+    id: int
+    consumption: Optional[float] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+class WaterReadingInput(BaseModel):
+    period: str  # YYYY-MM
+    date: Optional[str] = None  # YYYY-MM-DD
+    room: str
+    warm_value: Optional[float] = None
+    cold_value: Optional[float] = None
+
+class WaterReading(WaterReadingInput):
+    id: int
+    total_value: Optional[float] = None
+    warm_consumption: Optional[float] = None
+    cold_consumption: Optional[float] = None
+    total_consumption: Optional[float] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+class GasReadingInput(BaseModel):
+    period: str  # YYYY-MM
+    date: Optional[str] = None  # YYYY-MM-DD
+    room: str
+    value: float
+
+class GasReading(GasReadingInput):
+    id: int
+    consumption: Optional[float] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+# Legacy Consumption Model (for compatibility)
 class ConsumptionItem(BaseModel):
     period: str
     date: Optional[str]
     type: str
     meter: str
     channel: Optional[str]
-    value: float # The counter reading
-    consumption: Optional[float] # The calculated consumption (diff)
+    value: float  # The counter reading
+    consumption: Optional[float]  # The calculated consumption (diff)
 
 class MeterSummary(BaseModel):
     type: str
     consumption: float
+
+# New Monthly Readings Response Model
+class MonthlyReadings(BaseModel):
+    period: str
+    electricity: List[ElectricityReading]
+    water: List[WaterReading]
+    gas: List[GasReading]
+
+# Consumption Calculation Models
+class ConsumptionCalcItem(BaseModel):
+    id: int
+    period: str
+    entity_type: str
+    entity_id: str
+    consumption_value: Optional[float]
+    calculated_at: str

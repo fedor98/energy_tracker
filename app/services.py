@@ -1,6 +1,6 @@
 from typing import List, Dict, Any, Optional
 from .models import ReadingItem, ConsumptionItem
-from .db import get_readings
+from .db import get_all_readings
 
 def calculate_consumption(type_filter: Optional[str] = None, start_period: Optional[str] = None, end_period: Optional[str] = None) -> List[ConsumptionItem]:
     # We fetch potentially more readings than requested to calculate consumption for the first requested month
@@ -8,7 +8,7 @@ def calculate_consumption(type_filter: Optional[str] = None, start_period: Optio
     # For simplicity, we fetch all and filter in python, or we could optimize query. 
     # Since it's local sqlite and "small", fetching all is fine.
     
-    all_readings = get_readings() # Fetch all sorted by period
+    all_readings = get_all_readings()  # Fetch all sorted by period
     
     # Structure: readings_by_key[key] = [ {period: '2024-01', value: 100}, ... ]
     readings_by_key = {}
@@ -57,7 +57,7 @@ def calculate_consumption(type_filter: Optional[str] = None, start_period: Optio
                 date=entry['date'],
                 type=r_type,
                 meter=r_meter,
-                channel=r_channel if r_channel != 'default' else None,
+                channel=r_channel if r_channel not in ('default', 'None') else None,
                 value=entry['value'],
                 consumption=consumption
             ))
