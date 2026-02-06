@@ -801,6 +801,16 @@ select {
     padding: 0.75rem 1.5rem;
 }
 
+.edit-actions .btn-danger {
+    background-color: var(--danger-color);
+    color: white;
+    border: none;
+}
+
+.edit-actions .btn-danger:hover {
+    background-color: #dc2626;
+}
+
 /* ============================================
    MOBILE OPTIMIZATIONS FOR EDIT PAGE
    ============================================ */

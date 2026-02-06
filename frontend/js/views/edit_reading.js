@@ -1,4 +1,4 @@
-import { getMonthlyReadings, updateElectricityReading, updateWaterReading, updateGasReading } from '../api.js';
+import { getMonthlyReadings, updateElectricityReading, updateWaterReading, updateGasReading, deleteElectricityReading, deleteWaterReading, deleteGasReading } from '../api.js';
 
 export async function render(container, params) {
     const { period } = params;
@@ -62,6 +62,8 @@ export async function render(container, params) {
             </div>
             
             <div class="edit-actions" id="edit-actions" style="display: none;">
+                <button class="btn-danger" id="btn-delete-period">Delete Period</button>
+                <div style="flex-grow: 1;"></div>
                 <button class="btn-secondary" id="btn-cancel">Cancel</button>
                 <button class="btn-primary btn-save-all" id="btn-save-all">
                     Save All Changes
@@ -262,6 +264,60 @@ export async function render(container, params) {
                 }
             } else {
                 window.router.navigate('/');
+            }
+        });
+
+        // Delete period button
+        container.querySelector('#btn-delete-period').addEventListener('click', async () => {
+            if (!confirm(`Are you sure you want to delete all readings for ${period}? This action cannot be undone.`)) {
+                return;
+            }
+
+            const btn = container.querySelector('#btn-delete-period');
+            const originalText = btn.textContent;
+
+            try {
+                btn.disabled = true;
+                btn.textContent = 'Deleting...';
+
+                // Delete all readings for this period
+                const deletePromises = [];
+
+                // Delete electricity readings
+                if (readingsData.electricity) {
+                    readingsData.electricity.forEach(r => {
+                        deletePromises.push(deleteElectricityReading(r.id));
+                    });
+                }
+
+                // Delete water readings
+                if (readingsData.water) {
+                    readingsData.water.forEach(r => {
+                        deletePromises.push(deleteWaterReading(r.id));
+                    });
+                }
+
+                // Delete gas readings
+                if (readingsData.gas) {
+                    readingsData.gas.forEach(r => {
+                        deletePromises.push(deleteGasReading(r.id));
+                    });
+                }
+
+                await Promise.all(deletePromises);
+
+                btn.textContent = 'Deleted!';
+                setTimeout(() => {
+                    window.router.navigate('/');
+                }, 1000);
+
+            } catch (e) {
+                btn.textContent = 'Error!';
+                alert(`Failed to delete: ${e.message}`);
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                }, 1500);
             }
         });
 
