@@ -182,12 +182,24 @@ function renderChart(container, elecData, waterData, gasData) {
     function processData(data, type) {
         data.forEach(row => {
             if (row.period) {
-                allPeriods.add(row.period);
                 if (!datasets[type][row.period]) datasets[type][row.period] = 0;
+                
                 if (type === 'water') {
-                    datasets[type][row.period] += (row.warm_consumption || 0) + (row.cold_consumption || 0);
+                    // Only include if calculation_details exist (meaning it was actually calculated)
+                    if (row.warm_calculation_details) {
+                        datasets[type][row.period] += row.warm_consumption || 0;
+                        allPeriods.add(row.period);
+                    }
+                    if (row.cold_calculation_details) {
+                        datasets[type][row.period] += row.cold_consumption || 0;
+                        allPeriods.add(row.period);
+                    }
                 } else {
-                    datasets[type][row.period] += row.consumption || 0;
+                    // Only include if calculation_details exist (meaning it was actually calculated)
+                    if (row.calculation_details) {
+                        datasets[type][row.period] += row.consumption || 0;
+                        allPeriods.add(row.period);
+                    }
                 }
             }
         });

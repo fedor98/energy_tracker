@@ -32,6 +32,7 @@ def init_db():
             date TEXT NOT NULL,
             meter_name TEXT NOT NULL,
             value REAL NOT NULL,
+            comment TEXT,
             UNIQUE(date, meter_name)
         )
     ''')
@@ -44,6 +45,7 @@ def init_db():
             warm_value REAL,
             cold_value REAL,
             total_value REAL,
+            comment TEXT,
             UNIQUE(date, room)
         )
     ''')
@@ -54,6 +56,7 @@ def init_db():
             date TEXT NOT NULL,
             room TEXT NOT NULL,
             value REAL NOT NULL,
+            comment TEXT,
             UNIQUE(date, room)
         )
     ''')
@@ -66,8 +69,7 @@ def init_db():
             entity_type TEXT NOT NULL,
             entity_id TEXT NOT NULL,
             consumption_value REAL,
-            current_value REAL,
-            previous_value REAL,
+            calculation_details TEXT,
             calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             UNIQUE(period, entity_type, entity_id)
         )
@@ -108,8 +110,61 @@ def init_db():
     conn.commit()
     conn.close()
 
+def _calculate_consumption_from_readings(readings: List[sqlite3.Row]) -> tuple:
+    """
+    Calculate consumption from a list of readings.
+    Returns (total_consumption, calculation_details_dict, segment_count)
+    
+    Each reading should have: date, value, comment
+    """
+    import json
+    
+    if len(readings) < 2:
+        return None, None, 0
+    
+    segments = []
+    total_consumption = 0.0
+    segment_count = 0
+    
+    # Build segments list with all readings
+    for reading in readings:
+        comment_val = reading['comment'] if 'comment' in reading.keys() else ''
+        segments.append({
+            "date": reading['date'],
+            "value": reading['value'],
+            "comment": comment_val or ''
+        })
+    
+    # Calculate consumption for each consecutive pair
+    for i in range(len(readings) - 1):
+        current_value = readings[i]['value']
+        next_value = readings[i + 1]['value']
+        
+        diff = next_value - current_value
+        
+        if diff < 0:
+            # Reset detected - new meter starts at next_value
+            consumption = next_value
+        else:
+            consumption = diff
+        
+        total_consumption += consumption
+        segment_count += 1
+    
+    calculation_details = {
+        "segments": segments,
+        "total_consumption": total_consumption,
+        "segment_count": segment_count,
+        "first_reading_date": readings[0]['date'],
+        "last_reading_date": readings[-1]['date']
+    }
+    
+    return total_consumption, calculation_details, segment_count
+
+
 def _calculate_electricity_consumption(conn, meter_name: str, date: str):
     """Calculate and store electricity consumption for a specific period."""
+    import json
     c = conn.cursor()
     period = date[:7]  # YYYY-MM from YYYY-MM-DD
     
@@ -119,106 +174,155 @@ def _calculate_electricity_consumption(conn, meter_name: str, date: str):
         WHERE period = ? AND entity_type = 'electricity' AND entity_id = ?
     ''', (period, meter_name))
     
-    # Get current reading for the period (last reading of the period)
+    # Get all readings for the period
     c.execute('''
-        SELECT value, date FROM readings_electricity 
+        SELECT date, value, comment FROM readings_electricity 
         WHERE meter_name = ? AND SUBSTR(date, 1, 7) = ?
-        ORDER BY date DESC LIMIT 1
+        ORDER BY date ASC
     ''', (meter_name, period))
-    current = c.fetchone()
+    period_readings = c.fetchall()
     
-    # Get previous period's last reading
+    if len(period_readings) == 0:
+        conn.commit()
+        return
+    
+    # Get first reading of next period (needed for last segment calculation)
     c.execute('''
-        SELECT value FROM readings_electricity 
-        WHERE meter_name = ? AND date < ?
-        ORDER BY date DESC LIMIT 1
-    ''', (meter_name, f"{period}-01"))
-    previous = c.fetchone()
+        SELECT date, value, comment FROM readings_electricity 
+        WHERE meter_name = ? AND date >= ?
+        ORDER BY date ASC LIMIT 1
+    ''', (meter_name, f"{period}-32"))  # Day 32 ensures we're in next month
+    next_period_reading = c.fetchone()
     
-    if current and previous:
-        consumption = current['value'] - previous['value']
-        if consumption < 0:
-            consumption = 0  # Handle meter reset
-        
-        c.execute('''
-            INSERT INTO consumption_calc (period, entity_type, entity_id, consumption_value, current_value, previous_value)
-            VALUES (?, 'electricity', ?, ?, ?, ?)
-        ''', (period, meter_name, consumption, current['value'], previous['value']))
+    # Combine readings: period readings + next period's first reading
+    all_readings = list(period_readings)
+    if next_period_reading:
+        all_readings.append(next_period_reading)
+    
+    # Calculate consumption
+    consumption, calc_details, segment_count = _calculate_consumption_from_readings(all_readings)
+    
+    # Insert calculation result
+    calc_details_json = json.dumps(calc_details) if calc_details else None
+    c.execute('''
+        INSERT INTO consumption_calc (period, entity_type, entity_id, consumption_value, calculation_details)
+        VALUES (?, 'electricity', ?, ?, ?)
+    ''', (period, meter_name, consumption, calc_details_json))
     
     conn.commit()
 
 def _calculate_water_consumption(conn, room: str, date: str):
     """Calculate and store water consumption for a specific period."""
+    import json
     c = conn.cursor()
     period = date[:7]  # YYYY-MM from YYYY-MM-DD
     
-    # Get current reading for the period (last reading of the period)
+    # Delete old calculations for all water types
     c.execute('''
-        SELECT warm_value, cold_value FROM readings_water 
+        DELETE FROM consumption_calc 
+        WHERE period = ? AND entity_id = ? AND entity_type IN ('water_warm', 'water_cold', 'water_total')
+    ''', (period, room))
+    
+    # Get all readings for the period
+    c.execute('''
+        SELECT date, warm_value, cold_value, comment FROM readings_water 
         WHERE room = ? AND SUBSTR(date, 1, 7) = ?
-        ORDER BY date DESC LIMIT 1
+        ORDER BY date ASC
     ''', (room, period))
-    current = c.fetchone()
+    period_readings = c.fetchall()
     
-    # Get previous period's last reading
+    if len(period_readings) == 0:
+        conn.commit()
+        return
+    
+    # Get first reading of next period
     c.execute('''
-        SELECT warm_value, cold_value FROM readings_water 
-        WHERE room = ? AND date < ?
-        ORDER BY date DESC LIMIT 1
-    ''', (room, f"{period}-01"))
-    previous = c.fetchone()
+        SELECT date, warm_value, cold_value, comment FROM readings_water 
+        WHERE room = ? AND date >= ?
+        ORDER BY date ASC LIMIT 1
+    ''', (room, f"{period}-32"))
+    next_period_reading = c.fetchone()
     
-    if current and previous:
-        # Warm water
-        if current['warm_value'] is not None and previous['warm_value'] is not None:
-            warm_consumption = current['warm_value'] - previous['warm_value']
-            if warm_consumption < 0:
-                warm_consumption = 0
-            
-            c.execute('''
-                DELETE FROM consumption_calc 
-                WHERE period = ? AND entity_type = 'water_warm' AND entity_id = ?
-            ''', (period, room))
-            c.execute('''
-                INSERT INTO consumption_calc (period, entity_type, entity_id, consumption_value, current_value, previous_value)
-                VALUES (?, 'water_warm', ?, ?, ?, ?)
-            ''', (period, room, warm_consumption, current['warm_value'], previous['warm_value']))
+    # Helper function to calculate consumption for a specific channel
+    def calculate_channel_consumption(channel_name, channel_type):
+        # Build readings list for this channel
+        channel_readings = []
+        for reading in period_readings:
+            value = reading[channel_name]
+            if value is not None:
+                channel_readings.append({
+                    'date': reading['date'],
+                    'value': value,
+                    'comment': reading['comment'] or ''
+                })
         
-        # Cold water
-        if current['cold_value'] is not None and previous['cold_value'] is not None:
-            cold_consumption = current['cold_value'] - previous['cold_value']
-            if cold_consumption < 0:
-                cold_consumption = 0
-            
-            c.execute('''
-                DELETE FROM consumption_calc 
-                WHERE period = ? AND entity_type = 'water_cold' AND entity_id = ?
-            ''', (period, room))
-            c.execute('''
-                INSERT INTO consumption_calc (period, entity_type, entity_id, consumption_value, current_value, previous_value)
-                VALUES (?, 'water_cold', ?, ?, ?, ?)
-            ''', (period, room, cold_consumption, current['cold_value'], previous['cold_value']))
+        # Add next period reading if available
+        if next_period_reading and next_period_reading[channel_name] is not None:
+            channel_readings.append({
+                'date': next_period_reading['date'],
+                'value': next_period_reading[channel_name],
+                'comment': next_period_reading['comment'] or ''
+            })
         
-        # Total water
-        current_total = (current['warm_value'] or 0) + (current['cold_value'] or 0)
-        previous_total = (previous['warm_value'] or 0) + (previous['cold_value'] or 0)
-        total_consumption = current_total - previous_total
-        if total_consumption < 0:
-            total_consumption = 0
+        if len(channel_readings) < 2:
+            return None, None
         
+        consumption, calc_details, segment_count = _calculate_consumption_from_readings(channel_readings)
+        return consumption, calc_details
+    
+    # Check if warm water readings exist and calculate
+    has_warm_readings = any(r['warm_value'] is not None for r in period_readings)
+    if has_warm_readings:
+        warm_consumption, warm_details = calculate_channel_consumption('warm_value', 'water_warm')
         c.execute('''
-            DELETE FROM consumption_calc 
-            WHERE period = ? AND entity_type = 'water_total' AND entity_id = ?
-        ''', (period, room))
+            INSERT INTO consumption_calc (period, entity_type, entity_id, consumption_value, calculation_details)
+            VALUES (?, 'water_warm', ?, ?, ?)
+        ''', (period, room, warm_consumption, json.dumps(warm_details) if warm_details else None))
+    
+    # Check if cold water readings exist and calculate
+    has_cold_readings = any(r['cold_value'] is not None for r in period_readings)
+    if has_cold_readings:
+        cold_consumption, cold_details = calculate_channel_consumption('cold_value', 'water_cold')
         c.execute('''
-            INSERT INTO consumption_calc (period, entity_type, entity_id, consumption_value, current_value, previous_value)
-            VALUES (?, 'water_total', ?, ?, ?, ?)
-        ''', (period, room, total_consumption, current_total, previous_total))
+            INSERT INTO consumption_calc (period, entity_type, entity_id, consumption_value, calculation_details)
+            VALUES (?, 'water_cold', ?, ?, ?)
+        ''', (period, room, cold_consumption, json.dumps(cold_details) if cold_details else None))
+    
+    # Calculate for total (sum of warm + cold for each reading) - always insert if any water readings exist
+    if has_warm_readings or has_cold_readings:
+        total_readings = []
+        for reading in period_readings:
+            warm = reading['warm_value'] or 0
+            cold = reading['cold_value'] or 0
+            total = warm + cold
+            total_readings.append({
+                'date': reading['date'],
+                'value': total,
+                'comment': reading['comment'] or ''
+            })
+        
+        # Add next period total
+        if next_period_reading:
+            warm = next_period_reading['warm_value'] or 0
+            cold = next_period_reading['cold_value'] or 0
+            total = warm + cold
+            total_readings.append({
+                'date': next_period_reading['date'],
+                'value': total,
+                'comment': next_period_reading['comment'] or ''
+            })
+        
+        total_consumption, total_details, _ = _calculate_consumption_from_readings(total_readings)
+        c.execute('''
+            INSERT INTO consumption_calc (period, entity_type, entity_id, consumption_value, calculation_details)
+            VALUES (?, 'water_total', ?, ?, ?)
+        ''', (period, room, total_consumption, json.dumps(total_details) if total_details else None))
     
     conn.commit()
 
 def _calculate_gas_consumption(conn, room: str, date: str):
     """Calculate and store gas consumption for a specific period."""
+    import json
     c = conn.cursor()
     period = date[:7]  # YYYY-MM from YYYY-MM-DD
     
@@ -228,31 +332,40 @@ def _calculate_gas_consumption(conn, room: str, date: str):
         WHERE period = ? AND entity_type = 'gas' AND entity_id = ?
     ''', (period, room))
     
-    # Get current reading for the period (last reading of the period)
+    # Get all readings for the period
     c.execute('''
-        SELECT value FROM readings_gas 
+        SELECT date, value, comment FROM readings_gas 
         WHERE room = ? AND SUBSTR(date, 1, 7) = ?
-        ORDER BY date DESC LIMIT 1
+        ORDER BY date ASC
     ''', (room, period))
-    current = c.fetchone()
+    period_readings = c.fetchall()
     
-    # Get previous period's last reading
+    if len(period_readings) == 0:
+        conn.commit()
+        return
+    
+    # Get first reading of next period
     c.execute('''
-        SELECT value FROM readings_gas 
-        WHERE room = ? AND date < ?
-        ORDER BY date DESC LIMIT 1
-    ''', (room, f"{period}-01"))
-    previous = c.fetchone()
+        SELECT date, value, comment FROM readings_gas 
+        WHERE room = ? AND date >= ?
+        ORDER BY date ASC LIMIT 1
+    ''', (room, f"{period}-32"))
+    next_period_reading = c.fetchone()
     
-    if current and previous:
-        consumption = current['value'] - previous['value']
-        if consumption < 0:
-            consumption = 0  # Handle meter reset
-        
-        c.execute('''
-            INSERT INTO consumption_calc (period, entity_type, entity_id, consumption_value, current_value, previous_value)
-            VALUES (?, 'gas', ?, ?, ?, ?)
-        ''', (period, room, consumption, current['value'], previous['value']))
+    # Combine readings
+    all_readings = list(period_readings)
+    if next_period_reading:
+        all_readings.append(next_period_reading)
+    
+    # Calculate consumption
+    consumption, calc_details, segment_count = _calculate_consumption_from_readings(all_readings)
+    
+    # Insert calculation result
+    calc_details_json = json.dumps(calc_details) if calc_details else None
+    c.execute('''
+        INSERT INTO consumption_calc (period, entity_type, entity_id, consumption_value, calculation_details)
+        VALUES (?, 'gas', ?, ?, ?)
+    ''', (period, room, consumption, calc_details_json))
     
     conn.commit()
 
@@ -282,18 +395,38 @@ def save_electricity_reading(reading: ElectricityReadingInput) -> int:
     c = conn.cursor()
     
     c.execute('''
-        INSERT INTO readings_electricity (date, meter_name, value)
-        VALUES (?, ?, ?)
+        INSERT INTO readings_electricity (date, meter_name, value, comment)
+        VALUES (?, ?, ?, ?)
         ON CONFLICT(date, meter_name) DO UPDATE SET
-            value = excluded.value
+            value = excluded.value,
+            comment = excluded.comment
         RETURNING id
-    ''', (reading.date, reading.meter_name, reading.value))
+    ''', (reading.date, reading.meter_name, reading.value, reading.comment))
     
     result = c.fetchone()
     conn.commit()
     
-    # Calculate consumption
+    # Calculate consumption for current month
     _calculate_electricity_consumption(conn, reading.meter_name, reading.date)
+    
+    # Also recalculate previous month (if it has data)
+    from datetime import datetime
+    current_date = datetime.strptime(reading.date, '%Y-%m-%d')
+    if current_date.month == 1:
+        prev_year = current_date.year - 1
+        prev_month = 12
+    else:
+        prev_year = current_date.year
+        prev_month = current_date.month - 1
+    prev_period = f"{prev_year:04d}-{prev_month:02d}"
+    
+    c.execute('''
+        SELECT 1 FROM readings_electricity 
+        WHERE meter_name = ? AND SUBSTR(date, 1, 7) = ?
+        LIMIT 1
+    ''', (reading.meter_name, prev_period))
+    if c.fetchone():
+        _calculate_electricity_consumption(conn, reading.meter_name, f"{prev_period}-01")
     
     conn.close()
     
@@ -308,8 +441,7 @@ def get_electricity_reading(id: int) -> Optional[Dict[str, Any]]:
         SELECT e.*, 
             SUBSTR(e.date, 1, 7) as period,
             c.consumption_value as consumption,
-            c.current_value,
-            c.previous_value
+            c.calculation_details
         FROM readings_electricity e
         LEFT JOIN consumption_calc c ON SUBSTR(e.date, 1, 7) = c.period 
             AND c.entity_type = 'electricity' 
@@ -335,8 +467,7 @@ def get_electricity_readings(
         SELECT e.*, 
             SUBSTR(e.date, 1, 7) as period,
             c.consumption_value as consumption,
-            c.current_value,
-            c.previous_value
+            c.calculation_details
         FROM readings_electricity e
         LEFT JOIN consumption_calc c ON SUBSTR(e.date, 1, 7) = c.period 
             AND c.entity_type = 'electricity' 
@@ -355,7 +486,7 @@ def get_electricity_readings(
         query += " AND e.meter_name = ?"
         params.append(meter_name)
     
-    query += " ORDER BY e.date ASC, e.meter_name"
+    query += " ORDER BY e.date DESC, e.meter_name"
     
     c.execute(query, params)
     rows = c.fetchall()
@@ -370,9 +501,9 @@ def update_electricity_reading(id: int, reading: ElectricityReadingInput) -> boo
     
     c.execute('''
         UPDATE readings_electricity 
-        SET date = ?, meter_name = ?, value = ?
+        SET date = ?, meter_name = ?, value = ?, comment = ?
         WHERE id = ?
-    ''', (reading.date, reading.meter_name, reading.value, id))
+    ''', (reading.date, reading.meter_name, reading.value, reading.comment, id))
     
     updated = c.rowcount > 0
     conn.commit()
@@ -422,20 +553,43 @@ def save_water_reading(reading: WaterReadingInput) -> int:
     total_value = total if total > 0 else None
     
     c.execute('''
-        INSERT INTO readings_water (date, room, warm_value, cold_value, total_value)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO readings_water (date, room, warm_value, cold_value, total_value, comment)
+        VALUES (?, ?, ?, ?, ?, ?)
         ON CONFLICT(date, room) DO UPDATE SET
             warm_value = excluded.warm_value,
             cold_value = excluded.cold_value,
-            total_value = excluded.total_value
+            total_value = excluded.total_value,
+            comment = excluded.comment
         RETURNING id
-    ''', (reading.date, reading.room, reading.warm_value, reading.cold_value, total_value))
+    ''', (reading.date, reading.room, reading.warm_value, reading.cold_value, total_value, reading.comment))
     
     result = c.fetchone()
     conn.commit()
     
-    # Calculate consumption
+    # Calculate consumption for current month
     _calculate_water_consumption(conn, reading.room, reading.date)
+    
+    # Also recalculate previous month (if it has data) since the new reading
+    # provides the "next period" data needed for the previous month's calculation
+    from datetime import datetime
+    current_date = datetime.strptime(reading.date, '%Y-%m-%d')
+    if current_date.month == 1:
+        prev_year = current_date.year - 1
+        prev_month = 12
+    else:
+        prev_year = current_date.year
+        prev_month = current_date.month - 1
+    prev_period = f"{prev_year:04d}-{prev_month:02d}"
+    
+    # Check if there are readings for the previous month
+    c.execute('''
+        SELECT 1 FROM readings_water 
+        WHERE room = ? AND SUBSTR(date, 1, 7) = ?
+        LIMIT 1
+    ''', (reading.room, prev_period))
+    if c.fetchone():
+        # Recalculate previous month with the first day of that month
+        _calculate_water_consumption(conn, reading.room, f"{prev_period}-01")
     
     conn.close()
     
@@ -450,14 +604,11 @@ def get_water_reading(id: int) -> Optional[Dict[str, Any]]:
         SELECT w.*,
             SUBSTR(w.date, 1, 7) as period,
             cw.consumption_value as warm_consumption,
-            cw.current_value as warm_current_value,
-            cw.previous_value as warm_previous_value,
+            cw.calculation_details as warm_calculation_details,
             cc.consumption_value as cold_consumption,
-            cc.current_value as cold_current_value,
-            cc.previous_value as cold_previous_value,
+            cc.calculation_details as cold_calculation_details,
             ct.consumption_value as total_consumption,
-            ct.current_value as total_current_value,
-            ct.previous_value as total_previous_value
+            ct.calculation_details as total_calculation_details
         FROM readings_water w
         LEFT JOIN consumption_calc cw ON SUBSTR(w.date, 1, 7) = cw.period 
             AND cw.entity_type = 'water_warm' AND cw.entity_id = w.room
@@ -486,14 +637,11 @@ def get_water_readings(
         SELECT w.*,
             SUBSTR(w.date, 1, 7) as period,
             cw.consumption_value as warm_consumption,
-            cw.current_value as warm_current_value,
-            cw.previous_value as warm_previous_value,
+            cw.calculation_details as warm_calculation_details,
             cc.consumption_value as cold_consumption,
-            cc.current_value as cold_current_value,
-            cc.previous_value as cold_previous_value,
+            cc.calculation_details as cold_calculation_details,
             ct.consumption_value as total_consumption,
-            ct.current_value as total_current_value,
-            ct.previous_value as total_previous_value
+            ct.calculation_details as total_calculation_details
         FROM readings_water w
         LEFT JOIN consumption_calc cw ON SUBSTR(w.date, 1, 7) = cw.period 
             AND cw.entity_type = 'water_warm' AND cw.entity_id = w.room
@@ -515,7 +663,7 @@ def get_water_readings(
         query += " AND w.room = ?"
         params.append(room)
     
-    query += " ORDER BY w.date ASC, w.room"
+    query += " ORDER BY w.date DESC, w.room"
     
     c.execute(query, params)
     rows = c.fetchall()
@@ -533,10 +681,10 @@ def update_water_reading(id: int, reading: WaterReadingInput) -> bool:
     
     c.execute('''
         UPDATE readings_water 
-        SET date = ?, room = ?, warm_value = ?, cold_value = ?, total_value = ?
+        SET date = ?, room = ?, warm_value = ?, cold_value = ?, total_value = ?, comment = ?
         WHERE id = ?
     ''', (reading.date, reading.room, reading.warm_value, 
-          reading.cold_value, total_value, id))
+          reading.cold_value, total_value, reading.comment, id))
     
     updated = c.rowcount > 0
     conn.commit()
@@ -582,22 +730,43 @@ def save_gas_reading(reading: GasReadingInput) -> int:
     c = conn.cursor()
     
     c.execute('''
-        INSERT INTO readings_gas (date, room, value)
-        VALUES (?, ?, ?)
+        INSERT INTO readings_gas (date, room, value, comment)
+        VALUES (?, ?, ?, ?)
         ON CONFLICT(date, room) DO UPDATE SET
-            value = excluded.value
+            value = excluded.value,
+            comment = excluded.comment
         RETURNING id
-    ''', (reading.date, reading.room, reading.value))
+    ''', (reading.date, reading.room, reading.value, reading.comment))
     
     result = c.fetchone()
     conn.commit()
     
-    # Calculate consumption
+    # Calculate consumption for current month
     _calculate_gas_consumption(conn, reading.room, reading.date)
+    
+    # Also recalculate previous month (if it has data)
+    from datetime import datetime
+    current_date = datetime.strptime(reading.date, '%Y-%m-%d')
+    if current_date.month == 1:
+        prev_year = current_date.year - 1
+        prev_month = 12
+    else:
+        prev_year = current_date.year
+        prev_month = current_date.month - 1
+    prev_period = f"{prev_year:04d}-{prev_month:02d}"
+    
+    c.execute('''
+        SELECT 1 FROM readings_gas 
+        WHERE room = ? AND SUBSTR(date, 1, 7) = ?
+        LIMIT 1
+    ''', (reading.room, prev_period))
+    if c.fetchone():
+        _calculate_gas_consumption(conn, reading.room, f"{prev_period}-01")
     
     conn.close()
     
     return result['id']
+
 
 def get_gas_reading(id: int) -> Optional[Dict[str, Any]]:
     """Get a single gas reading by ID."""
@@ -608,8 +777,7 @@ def get_gas_reading(id: int) -> Optional[Dict[str, Any]]:
         SELECT g.*, 
             SUBSTR(g.date, 1, 7) as period,
             c.consumption_value as consumption,
-            c.current_value,
-            c.previous_value
+            c.calculation_details
         FROM readings_gas g
         LEFT JOIN consumption_calc c ON SUBSTR(g.date, 1, 7) = c.period 
             AND c.entity_type = 'gas' 
@@ -635,8 +803,7 @@ def get_gas_readings(
         SELECT g.*, 
             SUBSTR(g.date, 1, 7) as period,
             c.consumption_value as consumption,
-            c.current_value,
-            c.previous_value
+            c.calculation_details
         FROM readings_gas g
         LEFT JOIN consumption_calc c ON SUBSTR(g.date, 1, 7) = c.period 
             AND c.entity_type = 'gas' 
@@ -655,7 +822,7 @@ def get_gas_readings(
         query += " AND g.room = ?"
         params.append(room)
     
-    query += " ORDER BY g.date ASC, g.room"
+    query += " ORDER BY g.date DESC, g.room"
     
     c.execute(query, params)
     rows = c.fetchall()
@@ -670,9 +837,9 @@ def update_gas_reading(id: int, reading: GasReadingInput) -> bool:
     
     c.execute('''
         UPDATE readings_gas 
-        SET date = ?, room = ?, value = ?
+        SET date = ?, room = ?, value = ?, comment = ?
         WHERE id = ?
-    ''', (reading.date, reading.room, reading.value, id))
+    ''', (reading.date, reading.room, reading.value, reading.comment, id))
     
     updated = c.rowcount > 0
     conn.commit()
