@@ -24,18 +24,6 @@ export async function resetConfig() {
     return res.json();
 }
 
-export async function getReadings(params = {}) {
-    // Build query string
-    const query = new URLSearchParams();
-    if (params.start) query.append('start', params.start);
-    if (params.end) query.append('end', params.end);
-    if (params.type) query.append('type', params.type);
-
-    const res = await fetch(`${API_BASE}/readings?${query.toString()}`);
-    if (!res.ok) throw new Error('Failed to fetch readings');
-    return res.json();
-}
-
 export async function saveReadings(readings) {
     const res = await fetch(`${API_BASE}/readings`, {
         method: 'POST',

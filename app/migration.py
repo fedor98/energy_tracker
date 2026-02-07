@@ -42,27 +42,30 @@ def migrate_legacy_data():
             channel = reading['channel'] or 'default'
             value = reading['value']
             
+            # Use date from legacy data, or derive from period if missing
+            actual_date = date or f"{period}-01"
+            
             if r_type == 'electricity':
                 c.execute('''
                     INSERT OR REPLACE INTO readings_electricity 
-                    (period, date, meter_name, value)
-                    VALUES (?, ?, ?, ?)
-                ''', (period, date, meter, value))
+                    (date, meter_name, value)
+                    VALUES (?, ?, ?)
+                ''', (actual_date, meter, value))
                 
             elif r_type == 'gas':
                 c.execute('''
                     INSERT OR REPLACE INTO readings_gas 
-                    (period, date, room, value)
-                    VALUES (?, ?, ?, ?)
-                ''', (period, date, meter, value))
+                    (date, room, value)
+                    VALUES (?, ?, ?)
+                ''', (actual_date, meter, value))
                 
             elif r_type == 'water':
                 # Water readings can have warm/cold channels
-                # Check if room already exists for this period
+                # Check if room already exists for this date
                 c.execute('''
                     SELECT id, warm_value, cold_value FROM readings_water 
-                    WHERE period = ? AND room = ?
-                ''', (period, meter))
+                    WHERE date = ? AND room = ?
+                ''', (actual_date, meter))
                 existing = c.fetchone()
                 
                 if existing:
@@ -90,9 +93,9 @@ def migrate_legacy_data():
                     
                     c.execute('''
                         INSERT INTO readings_water 
-                        (period, date, room, warm_value, cold_value, total_value)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    ''', (period, date, meter, warm_val, cold_val, total if total > 0 else None))
+                        (date, room, warm_value, cold_value, total_value)
+                        VALUES (?, ?, ?, ?, ?)
+                    ''', (actual_date, meter, warm_val, cold_val, total if total > 0 else None))
         
         conn.commit()
         print(f"Successfully migrated {len(legacy_readings)} readings!")
@@ -217,17 +220,19 @@ def migrate_consumption_calc_values():
             
             if entity_type == 'electricity':
                 # Get current and previous values from readings_electricity
+                # period is in format YYYY-MM, date is YYYY-MM-DD
                 c.execute('''
                     SELECT value FROM readings_electricity
-                    WHERE meter_name = ? AND period = ?
+                    WHERE meter_name = ? AND SUBSTR(date, 1, 7) = ?
+                    ORDER BY date DESC LIMIT 1
                 ''', (entity_id, period))
                 current_row = c.fetchone()
                 
                 c.execute('''
                     SELECT value FROM readings_electricity
-                    WHERE meter_name = ? AND period < ?
-                    ORDER BY period DESC LIMIT 1
-                ''', (entity_id, period))
+                    WHERE meter_name = ? AND date < ?
+                    ORDER BY date DESC LIMIT 1
+                ''', (entity_id, f"{period}-01"))
                 previous_row = c.fetchone()
                 
                 if current_row:
@@ -239,15 +244,16 @@ def migrate_consumption_calc_values():
                 # Get current and previous values from readings_gas
                 c.execute('''
                     SELECT value FROM readings_gas
-                    WHERE room = ? AND period = ?
+                    WHERE room = ? AND SUBSTR(date, 1, 7) = ?
+                    ORDER BY date DESC LIMIT 1
                 ''', (entity_id, period))
                 current_row = c.fetchone()
                 
                 c.execute('''
                     SELECT value FROM readings_gas
-                    WHERE room = ? AND period < ?
-                    ORDER BY period DESC LIMIT 1
-                ''', (entity_id, period))
+                    WHERE room = ? AND date < ?
+                    ORDER BY date DESC LIMIT 1
+                ''', (entity_id, f"{period}-01"))
                 previous_row = c.fetchone()
                 
                 if current_row:
@@ -259,15 +265,16 @@ def migrate_consumption_calc_values():
                 # Get current and previous values from readings_water
                 c.execute('''
                     SELECT warm_value, cold_value FROM readings_water
-                    WHERE room = ? AND period = ?
+                    WHERE room = ? AND SUBSTR(date, 1, 7) = ?
+                    ORDER BY date DESC LIMIT 1
                 ''', (entity_id, period))
                 current_row = c.fetchone()
                 
                 c.execute('''
                     SELECT warm_value, cold_value FROM readings_water
-                    WHERE room = ? AND period < ?
-                    ORDER BY period DESC LIMIT 1
-                ''', (entity_id, period))
+                    WHERE room = ? AND date < ?
+                    ORDER BY date DESC LIMIT 1
+                ''', (entity_id, f"{period}-01"))
                 previous_row = c.fetchone()
                 
                 if current_row and previous_row:

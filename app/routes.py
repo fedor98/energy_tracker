@@ -3,7 +3,6 @@ from typing import List, Optional
 from .models import (
     AppConfig, 
     ReadingInput, 
-    ConsumptionItem,
     ElectricityReadingInput,
     WaterReadingInput,
     GasReadingInput,
@@ -31,10 +30,8 @@ from .db import (
     delete_electricity_reading,
     delete_water_reading,
     delete_gas_reading,
-    get_monthly_readings,
-    get_all_readings
+    get_monthly_readings
 )
-from .services import calculate_consumption
 from .migration import migrate_legacy_data, check_migration_needed, get_migration_status
 
 router = APIRouter()
@@ -70,16 +67,6 @@ def run_migration():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Migration failed: {str(e)}")
 
-# Legacy Readings Endpoints (for backward compatibility)
-@router.get("/readings", response_model=List[ConsumptionItem])
-def get_consumptions(
-    start: Optional[str] = Query(None, alias="start"),
-    end: Optional[str] = Query(None, alias="end"),
-    type: Optional[str] = Query(None, alias="type")
-):
-    """Legacy endpoint - returns consumption data in old format."""
-    return calculate_consumption(type_filter=type, start_period=start, end_period=end)
-
 @router.post("/readings")
 def add_readings(readings: List[ReadingInput]):
     """Legacy endpoint - saves readings to appropriate tables."""
@@ -95,9 +82,10 @@ def add_readings(readings: List[ReadingInput]):
         print(f"DEBUG: Processing: type={reading.type}, meter={reading.meter}, channel={reading.channel}, value={reading.value}", flush=True, file=sys.stderr)
         
         if reading.type == "electricity":
+            # Use date if provided, otherwise use last day of period
+            date = reading.date or f"{reading.period}-01"
             save_electricity_reading(ElectricityReadingInput(
-                period=reading.period,
-                date=reading.date,
+                date=date,
                 meter_name=reading.meter,
                 value=reading.value
             ))
@@ -108,9 +96,10 @@ def add_readings(readings: List[ReadingInput]):
             print(f"DEBUG: Water reading - key: {key}, channel: {reading.channel}", flush=True, file=sys.stderr)
             
             if key not in water_groups:
+                # Use date if provided, otherwise use first day of period
+                date = reading.date or f"{reading.period}-01"
                 water_groups[key] = {
-                    'period': reading.period,
-                    'date': reading.date,
+                    'date': date,
                     'room': reading.meter,
                     'warm_value': None,
                     'cold_value': None
@@ -128,9 +117,10 @@ def add_readings(readings: List[ReadingInput]):
                 water_groups[key]['warm_value'] = reading.value
                 print(f"DEBUG: Set warm_value (default) to {reading.value}", flush=True, file=sys.stderr)
         elif reading.type == "gas":
+            # Use date if provided, otherwise use first day of period
+            date = reading.date or f"{reading.period}-01"
             save_gas_reading(GasReadingInput(
-                period=reading.period,
-                date=reading.date,
+                date=date,
                 room=reading.meter,
                 value=reading.value
             ))
@@ -142,7 +132,6 @@ def add_readings(readings: List[ReadingInput]):
     for water_data in water_groups.values():
         print(f"DEBUG: Saving water reading: warm={water_data['warm_value']}, cold={water_data['cold_value']}", flush=True, file=sys.stderr)
         save_water_reading(WaterReadingInput(
-            period=water_data['period'],
             date=water_data['date'],
             room=water_data['room'],
             warm_value=water_data['warm_value'],

@@ -41,54 +41,38 @@ class ReadingItem(ReadingInput):
 
 # New Separate Reading Models
 class ElectricityReadingInput(BaseModel):
-    period: str  # YYYY-MM
-    date: Optional[str] = None  # YYYY-MM-DD
+    date: str  # YYYY-MM-DD
     meter_name: str
     value: float
 
 class ElectricityReading(ElectricityReadingInput):
     id: int
+    period: str  # YYYY-MM, derived from date
     consumption: Optional[float] = None
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
 
 class WaterReadingInput(BaseModel):
-    period: str  # YYYY-MM
-    date: Optional[str] = None  # YYYY-MM-DD
+    date: str  # YYYY-MM-DD
     room: str
     warm_value: Optional[float] = None
     cold_value: Optional[float] = None
 
 class WaterReading(WaterReadingInput):
     id: int
+    period: str  # YYYY-MM, derived from date
     total_value: Optional[float] = None
     warm_consumption: Optional[float] = None
     cold_consumption: Optional[float] = None
     total_consumption: Optional[float] = None
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
 
 class GasReadingInput(BaseModel):
-    period: str  # YYYY-MM
-    date: Optional[str] = None  # YYYY-MM-DD
+    date: str  # YYYY-MM-DD
     room: str
     value: float
 
 class GasReading(GasReadingInput):
     id: int
+    period: str  # YYYY-MM, derived from date
     consumption: Optional[float] = None
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
-
-# Legacy Consumption Model (for compatibility)
-class ConsumptionItem(BaseModel):
-    period: str
-    date: Optional[str]
-    type: str
-    meter: str
-    channel: Optional[str]
-    value: float  # The counter reading
-    consumption: Optional[float]  # The calculated consumption (diff)
 
 class MeterSummary(BaseModel):
     type: str
