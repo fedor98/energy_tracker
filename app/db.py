@@ -897,3 +897,79 @@ def backup_and_reset_db():
         shutil.move(DB_PATH, backup_path)
         
     init_db()
+
+def reorganize_tables():
+    """
+    Reorganize all readings tables to have newest entries first.
+    This recreates the tables with DESC ordering to optimize for newest-first queries.
+    """
+    import datetime
+    import shutil
+    
+    backup_path = None
+    
+    # Create backup first
+    if os.path.exists(DB_PATH):
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = f"{DB_PATH}_reorg_backup_{timestamp}.sqlite"
+        shutil.copy2(DB_PATH, backup_path)
+    
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    try:
+        # Reorganize readings_electricity
+        c.execute('''
+            CREATE TABLE readings_electricity_new AS
+            SELECT * FROM readings_electricity
+            ORDER BY date DESC, meter_name
+        ''')
+        c.execute('DROP TABLE readings_electricity')
+        c.execute('ALTER TABLE readings_electricity_new RENAME TO readings_electricity')
+        
+        # Reorganize readings_water
+        c.execute('''
+            CREATE TABLE readings_water_new AS
+            SELECT * FROM readings_water
+            ORDER BY date DESC, room
+        ''')
+        c.execute('DROP TABLE readings_water')
+        c.execute('ALTER TABLE readings_water_new RENAME TO readings_water')
+        
+        # Reorganize readings_gas
+        c.execute('''
+            CREATE TABLE readings_gas_new AS
+            SELECT * FROM readings_gas
+            ORDER BY date DESC, room
+        ''')
+        c.execute('DROP TABLE readings_gas')
+        c.execute('ALTER TABLE readings_gas_new RENAME TO readings_gas')
+        
+        # Reorganize consumption_calc
+        c.execute('''
+            CREATE TABLE consumption_calc_new AS
+            SELECT * FROM consumption_calc
+            ORDER BY period DESC, entity_type, entity_id
+        ''')
+        c.execute('DROP TABLE consumption_calc')
+        c.execute('ALTER TABLE consumption_calc_new RENAME TO consumption_calc')
+        
+        # Recreate indexes
+        c.execute('CREATE INDEX idx_electricity_date ON readings_electricity(date)')
+        c.execute('CREATE INDEX idx_electricity_period ON readings_electricity(SUBSTR(date, 1, 7))')
+        c.execute('CREATE INDEX idx_electricity_meter ON readings_electricity(meter_name)')
+        c.execute('CREATE INDEX idx_water_date ON readings_water(date)')
+        c.execute('CREATE INDEX idx_water_period ON readings_water(SUBSTR(date, 1, 7))')
+        c.execute('CREATE INDEX idx_water_room ON readings_water(room)')
+        c.execute('CREATE INDEX idx_gas_date ON readings_gas(date)')
+        c.execute('CREATE INDEX idx_gas_period ON readings_gas(SUBSTR(date, 1, 7))')
+        c.execute('CREATE INDEX idx_gas_room ON readings_gas(room)')
+        c.execute('CREATE INDEX idx_consumption_period ON consumption_calc(period)')
+        
+        conn.commit()
+        return {"status": "success", "message": "Tables reorganized successfully", "backup_created": backup_path}
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()

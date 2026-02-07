@@ -2,6 +2,7 @@ import { getConfig } from './api.js';
 import * as SetupView from './views/setup.js';
 import * as DashboardView from './views/dashboard.js';
 import * as AddReadingView from './views/add_reading.js';
+import * as SettingsView from './views/settings.js';
 
 const appContainer = document.getElementById('app-container');
 const nav = document.getElementById('main-nav');
@@ -28,9 +29,7 @@ const routes = [
     { 
         path: '/settings', 
         view: 'settings', 
-        render: async (container) => {
-            appContainer.innerHTML = '<h2>Settings</h2><p>Settings view implementation pending.</p>';
-        }, 
+        render: SettingsView.render, 
         navId: 'nav-settings' 
     },
     { 

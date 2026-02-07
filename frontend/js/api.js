@@ -193,3 +193,12 @@ export async function deleteGasReading(id) {
     if (!res.ok) throw new Error('Failed to delete gas reading');
     return res.json();
 }
+
+// Maintenance API
+export async function reorganizeDatabase() {
+    const res = await fetch(`${API_BASE}/maintenance/reorganize`, {
+        method: 'POST'
+    });
+    if (!res.ok) throw new Error('Failed to reorganize database');
+    return res.json();
+}

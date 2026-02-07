@@ -15,6 +15,7 @@ from .db import (
     get_config, 
     save_config, 
     backup_and_reset_db,
+    reorganize_tables,
     save_electricity_reading,
     save_water_reading,
     save_gas_reading,
@@ -310,3 +311,13 @@ def delete_gas(reading_id: int):
     if not deleted:
         raise HTTPException(status_code=404, detail="Gas reading not found")
     return {"status": "success", "message": "Reading deleted"}
+
+# Maintenance Endpoints
+@router.post("/maintenance/reorganize")
+def reorganize_database():
+    """Reorganize all tables to have newest entries first. Creates a backup before proceeding."""
+    try:
+        result = reorganize_tables()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Reorganization failed: {str(e)}")
