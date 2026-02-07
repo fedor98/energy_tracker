@@ -7,8 +7,7 @@ class GasConfig(BaseModel):
 
 class WaterConfig(BaseModel):
     room: str
-    has_warm: bool
-    has_cold: bool
+    is_warm_water: bool = False  # False = cold water, True = warm water
     
 class ElectricityConfig(BaseModel):
     meters: List[str]
@@ -55,20 +54,15 @@ class ElectricityReading(ElectricityReadingInput):
 class WaterReadingInput(BaseModel):
     date: str  # YYYY-MM-DD
     room: str
-    warm_value: Optional[float] = None
-    cold_value: Optional[float] = None
+    value: float
+    is_warm_water: bool = False  # False = cold water, True = warm water
     comment: Optional[str] = None
 
 class WaterReading(WaterReadingInput):
     id: int
     period: str  # YYYY-MM, derived from date
-    total_value: Optional[float] = None
-    warm_consumption: Optional[float] = None
-    cold_consumption: Optional[float] = None
-    total_consumption: Optional[float] = None
-    warm_calculation_details: Optional[str] = None
-    cold_calculation_details: Optional[str] = None
-    total_calculation_details: Optional[str] = None
+    consumption: Optional[float] = None
+    calculation_details: Optional[str] = None
 
 class GasReadingInput(BaseModel):
     date: str  # YYYY-MM-DD

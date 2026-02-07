@@ -124,7 +124,7 @@ function renderTable(container, data, type) {
     if (type === 'electricity') {
         html += '<th>Period</th><th>Date</th><th>Meter</th><th>Value</th>';
     } else if (type === 'water') {
-        html += '<th>Period</th><th>Date</th><th>Room</th><th>Warm (m³)</th><th>Cold (m³)</th>';
+        html += '<th>Period</th><th>Date</th><th>Meter</th><th>Value (m³)</th>';
     } else {
         html += '<th>Period</th><th>Date</th><th>Room</th><th>Value</th>';
     }
@@ -140,9 +140,9 @@ function renderTable(container, data, type) {
             html += `<td>${row.meter_name || row.meter || '-'}</td>`;
             html += `<td>${row.value !== null ? row.value.toFixed(2) : '-'} ${unit}</td>`;
         } else if (type === 'water') {
-            html += `<td>${row.room || row.meter || '-'}</td>`;
-            html += `<td>${row.warm_value !== null ? row.warm_value.toFixed(2) : '-'}</td>`;
-            html += `<td>${row.cold_value !== null ? row.cold_value.toFixed(2) : '-'}</td>`;
+            const emoji = row.is_warm_water ? '🔴' : '🔵';
+            html += `<td>${emoji} ${row.room || row.meter || '-'}</td>`;
+            html += `<td>${row.value !== null ? row.value.toFixed(2) : '-'} ${unit}</td>`;
         } else {
             html += `<td>${row.room || row.meter || '-'}</td>`;
             html += `<td>${row.value !== null ? row.value.toFixed(2) : '-'} ${unit}</td>`;

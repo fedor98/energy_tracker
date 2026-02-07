@@ -76,9 +76,6 @@ def add_readings(readings: List[ReadingInput]):
     
     count = 0
     
-    # Group water readings by (period, room) to handle warm/cold as single record
-    water_groups = {}
-    
     for reading in readings:
         print(f"DEBUG: Processing: type={reading.type}, meter={reading.meter}, channel={reading.channel}, value={reading.value}", flush=True, file=sys.stderr)
         
@@ -92,31 +89,18 @@ def add_readings(readings: List[ReadingInput]):
             ))
             count += 1
         elif reading.type == "water":
-            # Group water readings by period and room
-            key = (reading.period, reading.meter)
-            print(f"DEBUG: Water reading - key: {key}, channel: {reading.channel}", flush=True, file=sys.stderr)
+            # Handle each water reading as separate entry (warm or cold)
+            date = reading.date or f"{reading.period}-01"
+            is_warm = reading.channel == "warm" or reading.channel is None
             
-            if key not in water_groups:
-                # Use date if provided, otherwise use first day of period
-                date = reading.date or f"{reading.period}-01"
-                water_groups[key] = {
-                    'date': date,
-                    'room': reading.meter,
-                    'warm_value': None,
-                    'cold_value': None
-                }
-                print(f"DEBUG: Created new water group for key {key}", flush=True, file=sys.stderr)
-            
-            if reading.channel == "warm":
-                water_groups[key]['warm_value'] = reading.value
-                print(f"DEBUG: Set warm_value to {reading.value}", flush=True, file=sys.stderr)
-            elif reading.channel == "cold":
-                water_groups[key]['cold_value'] = reading.value
-                print(f"DEBUG: Set cold_value to {reading.value}", flush=True, file=sys.stderr)
-            else:
-                # Single value water reading (treat as total/warm)
-                water_groups[key]['warm_value'] = reading.value
-                print(f"DEBUG: Set warm_value (default) to {reading.value}", flush=True, file=sys.stderr)
+            save_water_reading(WaterReadingInput(
+                date=date,
+                room=reading.meter,
+                value=reading.value,
+                is_warm_water=is_warm
+            ))
+            count += 1
+            print(f"DEBUG: Saved water reading: room={reading.meter}, warm={is_warm}, value={reading.value}", flush=True, file=sys.stderr)
         elif reading.type == "gas":
             # Use date if provided, otherwise use first day of period
             date = reading.date or f"{reading.period}-01"
@@ -126,19 +110,6 @@ def add_readings(readings: List[ReadingInput]):
                 value=reading.value
             ))
             count += 1
-    
-    # Save grouped water readings
-    print(f"DEBUG: Water groups to save: {water_groups}", flush=True, file=sys.stderr)
-    
-    for water_data in water_groups.values():
-        print(f"DEBUG: Saving water reading: warm={water_data['warm_value']}, cold={water_data['cold_value']}", flush=True, file=sys.stderr)
-        save_water_reading(WaterReadingInput(
-            date=water_data['date'],
-            room=water_data['room'],
-            warm_value=water_data['warm_value'],
-            cold_value=water_data['cold_value']
-        ))
-        count += 1
     
     return {"status": "success", "count": count}
 
@@ -213,13 +184,15 @@ def delete_electricity(reading_id: int):
 def list_water(
     start: Optional[str] = Query(None, alias="start"),
     end: Optional[str] = Query(None, alias="end"),
-    room: Optional[str] = Query(None, alias="room")
+    room: Optional[str] = Query(None, alias="room"),
+    warm: Optional[bool] = Query(None, alias="warm")
 ):
     """List all water readings with optional filters."""
     readings = get_water_readings(
         start_period=start,
         end_period=end,
-        room=room
+        room=room,
+        is_warm_water=warm
     )
     return [WaterReading(**r) for r in readings]
 

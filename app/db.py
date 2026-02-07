@@ -42,11 +42,10 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             date TEXT NOT NULL,
             room TEXT NOT NULL,
-            warm_value REAL,
-            cold_value REAL,
-            total_value REAL,
+            value REAL NOT NULL,
+            is_warm_water BOOLEAN NOT NULL DEFAULT 0,
             comment TEXT,
-            UNIQUE(date, room)
+            UNIQUE(date, room, is_warm_water)
         )
     ''')
     
@@ -108,9 +107,89 @@ def init_db():
     ''')
     
     conn.commit()
+    
+    # Run migration if old table structure exists
+    _migrate_water_readings_if_needed(conn)
+    
     conn.close()
 
-def _calculate_consumption_from_readings(readings: List[sqlite3.Row]) -> tuple:
+
+def _migrate_water_readings_if_needed(conn):
+    """Migrate old water readings (with warm_value/cold_value/total_value) to new structure."""
+    c = conn.cursor()
+    
+    # Check if old table structure exists (has warm_value column)
+    c.execute("PRAGMA table_info(readings_water)")
+    columns = {col['name'] for col in c.fetchall()}
+    
+    if 'warm_value' not in columns:
+        # Already migrated or new database
+        return
+    
+    # Backup old data
+    c.execute('SELECT * FROM readings_water')
+    old_readings = c.fetchall()
+    
+    if not old_readings:
+        # No data to migrate, just recreate table
+        c.execute('DROP TABLE readings_water')
+        c.execute('''
+            CREATE TABLE readings_water (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date TEXT NOT NULL,
+                room TEXT NOT NULL,
+                value REAL NOT NULL,
+                is_warm_water BOOLEAN NOT NULL DEFAULT 0,
+                comment TEXT,
+                UNIQUE(date, room, is_warm_water)
+            )
+        ''')
+        conn.commit()
+        return
+    
+    # Create new table with migration suffix
+    c.execute('''
+        CREATE TABLE readings_water_new (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date TEXT NOT NULL,
+            room TEXT NOT NULL,
+            value REAL NOT NULL,
+            is_warm_water BOOLEAN NOT NULL DEFAULT 0,
+            comment TEXT,
+            UNIQUE(date, room, is_warm_water)
+        )
+    ''')
+    
+    # Migrate data: create separate rows for warm and cold water
+    for reading in old_readings:
+        comment = reading['comment'] or ''
+        
+        # Migrate warm water reading if exists
+        if reading['warm_value'] is not None:
+            c.execute('''
+                INSERT INTO readings_water_new (date, room, value, is_warm_water, comment)
+                VALUES (?, ?, ?, 1, ?)
+            ''', (reading['date'], reading['room'], reading['warm_value'], comment))
+        
+        # Migrate cold water reading if exists
+        if reading['cold_value'] is not None:
+            c.execute('''
+                INSERT INTO readings_water_new (date, room, value, is_warm_water, comment)
+                VALUES (?, ?, ?, 0, ?)
+            ''', (reading['date'], reading['room'], reading['cold_value'], comment))
+    
+    # Replace old table with new one
+    c.execute('DROP TABLE readings_water')
+    c.execute('ALTER TABLE readings_water_new RENAME TO readings_water')
+    
+    # Recreate indexes
+    c.execute('CREATE INDEX IF NOT EXISTS idx_water_date ON readings_water(date)')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_water_period ON readings_water(SUBSTR(date, 1, 7))')
+    c.execute('CREATE INDEX IF NOT EXISTS idx_water_room ON readings_water(room)')
+    
+    conn.commit()
+
+def _calculate_consumption_from_readings(readings: List[Dict[str, Any]]) -> tuple:
     """
     Calculate consumption from a list of readings.
     Returns (total_consumption, calculation_details_dict, segment_count)
@@ -211,112 +290,132 @@ def _calculate_electricity_consumption(conn, meter_name: str, date: str):
     
     conn.commit()
 
-def _calculate_water_consumption(conn, room: str, date: str):
-    """Calculate and store water consumption for a specific period."""
+def _calculate_water_consumption(conn, room: str, date: str, is_warm_water = None):
+    """Calculate and store water consumption for a specific period.
+    
+    Args:
+        conn: Database connection
+        room: Room name
+        date: Date in YYYY-MM-DD format
+        is_warm_water: If specified, only calculate for this type (True=warm, False=cold, None=both)
+    """
     import json
     c = conn.cursor()
     period = date[:7]  # YYYY-MM from YYYY-MM-DD
     
-    # Delete old calculations for all water types
-    c.execute('''
-        DELETE FROM consumption_calc 
-        WHERE period = ? AND entity_id = ? AND entity_type IN ('water_warm', 'water_cold', 'water_total')
-    ''', (period, room))
+    # Determine which water types to calculate
+    water_types = []
+    if is_warm_water is None or is_warm_water is True:
+        water_types.append(('water_warm', 1))
+    if is_warm_water is None or is_warm_water is False:
+        water_types.append(('water_cold', 0))
     
-    # Get all readings for the period
-    c.execute('''
-        SELECT date, warm_value, cold_value, comment FROM readings_water 
-        WHERE room = ? AND SUBSTR(date, 1, 7) = ?
-        ORDER BY date ASC
-    ''', (room, period))
-    period_readings = c.fetchall()
-    
-    if len(period_readings) == 0:
-        conn.commit()
-        return
-    
-    # Get first reading of next period
-    c.execute('''
-        SELECT date, warm_value, cold_value, comment FROM readings_water 
-        WHERE room = ? AND date >= ?
-        ORDER BY date ASC LIMIT 1
-    ''', (room, f"{period}-32"))
-    next_period_reading = c.fetchone()
-    
-    # Helper function to calculate consumption for a specific channel
-    def calculate_channel_consumption(channel_name, channel_type):
-        # Build readings list for this channel
-        channel_readings = []
-        for reading in period_readings:
-            value = reading[channel_name]
-            if value is not None:
-                channel_readings.append({
-                    'date': reading['date'],
-                    'value': value,
-                    'comment': reading['comment'] or ''
-                })
-        
-        # Add next period reading if available
-        if next_period_reading and next_period_reading[channel_name] is not None:
-            channel_readings.append({
-                'date': next_period_reading['date'],
-                'value': next_period_reading[channel_name],
-                'comment': next_period_reading['comment'] or ''
-            })
-        
-        if len(channel_readings) < 2:
-            return None, None
-        
-        consumption, calc_details, segment_count = _calculate_consumption_from_readings(channel_readings)
-        return consumption, calc_details
-    
-    # Check if warm water readings exist and calculate
-    has_warm_readings = any(r['warm_value'] is not None for r in period_readings)
-    if has_warm_readings:
-        warm_consumption, warm_details = calculate_channel_consumption('warm_value', 'water_warm')
+    for entity_type, is_warm in water_types:
+        # Delete old calculation for this type
         c.execute('''
-            INSERT INTO consumption_calc (period, entity_type, entity_id, consumption_value, calculation_details)
-            VALUES (?, 'water_warm', ?, ?, ?)
-        ''', (period, room, warm_consumption, json.dumps(warm_details) if warm_details else None))
-    
-    # Check if cold water readings exist and calculate
-    has_cold_readings = any(r['cold_value'] is not None for r in period_readings)
-    if has_cold_readings:
-        cold_consumption, cold_details = calculate_channel_consumption('cold_value', 'water_cold')
-        c.execute('''
-            INSERT INTO consumption_calc (period, entity_type, entity_id, consumption_value, calculation_details)
-            VALUES (?, 'water_cold', ?, ?, ?)
-        ''', (period, room, cold_consumption, json.dumps(cold_details) if cold_details else None))
-    
-    # Calculate for total (sum of warm + cold for each reading) - always insert if any water readings exist
-    if has_warm_readings or has_cold_readings:
-        total_readings = []
-        for reading in period_readings:
-            warm = reading['warm_value'] or 0
-            cold = reading['cold_value'] or 0
-            total = warm + cold
-            total_readings.append({
-                'date': reading['date'],
-                'value': total,
-                'comment': reading['comment'] or ''
-            })
+            DELETE FROM consumption_calc 
+            WHERE period = ? AND entity_id = ? AND entity_type = ?
+        ''', (period, room, entity_type))
         
-        # Add next period total
+        # Get all readings for the period and type
+        c.execute('''
+            SELECT date, value, comment FROM readings_water 
+            WHERE room = ? AND is_warm_water = ? AND SUBSTR(date, 1, 7) = ?
+            ORDER BY date ASC
+        ''', (room, is_warm, period))
+        period_readings = c.fetchall()
+        
+        if len(period_readings) == 0:
+            continue
+        
+        # Get first reading of next period
+        c.execute('''
+            SELECT date, value, comment FROM readings_water 
+            WHERE room = ? AND is_warm_water = ? AND date >= ?
+            ORDER BY date ASC LIMIT 1
+        ''', (room, is_warm, f"{period}-32"))
+        next_period_reading = c.fetchone()
+        
+        # Build readings list
+        all_readings = list(period_readings)
         if next_period_reading:
-            warm = next_period_reading['warm_value'] or 0
-            cold = next_period_reading['cold_value'] or 0
-            total = warm + cold
-            total_readings.append({
+            all_readings.append({
                 'date': next_period_reading['date'],
-                'value': total,
+                'value': next_period_reading['value'],
                 'comment': next_period_reading['comment'] or ''
             })
         
-        total_consumption, total_details, _ = _calculate_consumption_from_readings(total_readings)
+        # Calculate consumption
+        consumption, calc_details, _ = _calculate_consumption_from_readings(all_readings)
+        
+        # Insert calculation result
+        calc_details_json = json.dumps(calc_details) if calc_details else None
         c.execute('''
             INSERT INTO consumption_calc (period, entity_type, entity_id, consumption_value, calculation_details)
-            VALUES (?, 'water_total', ?, ?, ?)
-        ''', (period, room, total_consumption, json.dumps(total_details) if total_details else None))
+            VALUES (?, ?, ?, ?, ?)
+        ''', (period, entity_type, room, consumption, calc_details_json))
+    
+    # Calculate total consumption (sum of warm + cold) if both exist
+    if is_warm_water is None:
+        c.execute('''
+            DELETE FROM consumption_calc 
+            WHERE period = ? AND entity_id = ? AND entity_type = 'water_total'
+        ''', (period, room))
+        
+        # Get all water readings for this room/period
+        c.execute('''
+            SELECT date, value, is_warm_water, comment FROM readings_water 
+            WHERE room = ? AND SUBSTR(date, 1, 7) = ?
+            ORDER BY date ASC, is_warm_water
+        ''', (room, period))
+        all_readings = c.fetchall()
+        
+        if all_readings:
+            # Group readings by date and sum warm + cold
+            readings_by_date = {}
+            for r in all_readings:
+                date_key = r['date']
+                if date_key not in readings_by_date:
+                    readings_by_date[date_key] = {'value': 0, 'comment': r['comment'] or ''}
+                readings_by_date[date_key]['value'] += r['value']
+            
+            # Build total readings list
+            total_readings = [
+                {'date': d, 'value': v['value'], 'comment': v['comment']}
+                for d, v in sorted(readings_by_date.items())
+            ]
+            
+            # Get first reading of next period for total
+            c.execute('''
+                SELECT date, value, is_warm_water, comment FROM readings_water 
+                WHERE room = ? AND date >= ?
+                ORDER BY date ASC, is_warm_water
+            ''', (room, f"{period}-32"))
+            next_readings = c.fetchall()
+            
+            if next_readings:
+                # Sum next period readings by date
+                next_by_date = {}
+                for r in next_readings:
+                    date_key = r['date']
+                    if date_key not in next_by_date:
+                        next_by_date[date_key] = 0
+                    next_by_date[date_key] += r['value']
+                
+                # Add first date from next period
+                first_next_date = min(next_by_date.keys())
+                total_readings.append({
+                    'date': first_next_date,
+                    'value': next_by_date[first_next_date],
+                    'comment': ''
+                })
+            
+            if len(total_readings) >= 2:
+                total_consumption, total_details, _ = _calculate_consumption_from_readings(total_readings)
+                c.execute('''
+                    INSERT INTO consumption_calc (period, entity_type, entity_id, consumption_value, calculation_details)
+                    VALUES (?, 'water_total', ?, ?, ?)
+                ''', (period, room, total_consumption, json.dumps(total_details) if total_details else None))
     
     conn.commit()
 
@@ -548,26 +647,20 @@ def save_water_reading(reading: WaterReadingInput) -> int:
     conn = get_db_connection()
     c = conn.cursor()
     
-    # Calculate total
-    total = (reading.warm_value or 0) + (reading.cold_value or 0)
-    total_value = total if total > 0 else None
-    
     c.execute('''
-        INSERT INTO readings_water (date, room, warm_value, cold_value, total_value, comment)
-        VALUES (?, ?, ?, ?, ?, ?)
-        ON CONFLICT(date, room) DO UPDATE SET
-            warm_value = excluded.warm_value,
-            cold_value = excluded.cold_value,
-            total_value = excluded.total_value,
+        INSERT INTO readings_water (date, room, value, is_warm_water, comment)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(date, room, is_warm_water) DO UPDATE SET
+            value = excluded.value,
             comment = excluded.comment
         RETURNING id
-    ''', (reading.date, reading.room, reading.warm_value, reading.cold_value, total_value, reading.comment))
+    ''', (reading.date, reading.room, reading.value, reading.is_warm_water, reading.comment))
     
     result = c.fetchone()
     conn.commit()
     
     # Calculate consumption for current month
-    _calculate_water_consumption(conn, reading.room, reading.date)
+    _calculate_water_consumption(conn, reading.room, reading.date, reading.is_warm_water)
     
     # Also recalculate previous month (if it has data) since the new reading
     # provides the "next period" data needed for the previous month's calculation
@@ -584,12 +677,12 @@ def save_water_reading(reading: WaterReadingInput) -> int:
     # Check if there are readings for the previous month
     c.execute('''
         SELECT 1 FROM readings_water 
-        WHERE room = ? AND SUBSTR(date, 1, 7) = ?
+        WHERE room = ? AND is_warm_water = ? AND SUBSTR(date, 1, 7) = ?
         LIMIT 1
-    ''', (reading.room, prev_period))
+    ''', (reading.room, reading.is_warm_water, prev_period))
     if c.fetchone():
         # Recalculate previous month with the first day of that month
-        _calculate_water_consumption(conn, reading.room, f"{prev_period}-01")
+        _calculate_water_consumption(conn, reading.room, f"{prev_period}-01", reading.is_warm_water)
     
     conn.close()
     
@@ -603,19 +696,12 @@ def get_water_reading(id: int) -> Optional[Dict[str, Any]]:
     c.execute('''
         SELECT w.*,
             SUBSTR(w.date, 1, 7) as period,
-            cw.consumption_value as warm_consumption,
-            cw.calculation_details as warm_calculation_details,
-            cc.consumption_value as cold_consumption,
-            cc.calculation_details as cold_calculation_details,
-            ct.consumption_value as total_consumption,
-            ct.calculation_details as total_calculation_details
+            c.consumption_value,
+            c.calculation_details
         FROM readings_water w
-        LEFT JOIN consumption_calc cw ON SUBSTR(w.date, 1, 7) = cw.period 
-            AND cw.entity_type = 'water_warm' AND cw.entity_id = w.room
-        LEFT JOIN consumption_calc cc ON SUBSTR(w.date, 1, 7) = cc.period 
-            AND cc.entity_type = 'water_cold' AND cc.entity_id = w.room
-        LEFT JOIN consumption_calc ct ON SUBSTR(w.date, 1, 7) = ct.period 
-            AND ct.entity_type = 'water_total' AND ct.entity_id = w.room
+        LEFT JOIN consumption_calc c ON SUBSTR(w.date, 1, 7) = c.period 
+            AND c.entity_type = CASE WHEN w.is_warm_water = 1 THEN 'water_warm' ELSE 'water_cold' END
+            AND c.entity_id = w.room
         WHERE w.id = ?
     ''', (id,))
     
@@ -627,7 +713,8 @@ def get_water_reading(id: int) -> Optional[Dict[str, Any]]:
 def get_water_readings(
     start_period: Optional[str] = None,
     end_period: Optional[str] = None,
-    room: Optional[str] = None
+    room: Optional[str] = None,
+    is_warm_water: Optional[bool] = None
 ) -> List[Dict[str, Any]]:
     """Get water readings with optional filters."""
     conn = get_db_connection()
@@ -636,19 +723,12 @@ def get_water_readings(
     query = '''
         SELECT w.*,
             SUBSTR(w.date, 1, 7) as period,
-            cw.consumption_value as warm_consumption,
-            cw.calculation_details as warm_calculation_details,
-            cc.consumption_value as cold_consumption,
-            cc.calculation_details as cold_calculation_details,
-            ct.consumption_value as total_consumption,
-            ct.calculation_details as total_calculation_details
+            c.consumption_value,
+            c.calculation_details
         FROM readings_water w
-        LEFT JOIN consumption_calc cw ON SUBSTR(w.date, 1, 7) = cw.period 
-            AND cw.entity_type = 'water_warm' AND cw.entity_id = w.room
-        LEFT JOIN consumption_calc cc ON SUBSTR(w.date, 1, 7) = cc.period 
-            AND cc.entity_type = 'water_cold' AND cc.entity_id = w.room
-        LEFT JOIN consumption_calc ct ON SUBSTR(w.date, 1, 7) = ct.period 
-            AND ct.entity_type = 'water_total' AND ct.entity_id = w.room
+        LEFT JOIN consumption_calc c ON SUBSTR(w.date, 1, 7) = c.period 
+            AND c.entity_type = CASE WHEN w.is_warm_water = 1 THEN 'water_warm' ELSE 'water_cold' END
+            AND c.entity_id = w.room
         WHERE 1=1
     '''
     params = []
@@ -662,8 +742,11 @@ def get_water_readings(
     if room:
         query += " AND w.room = ?"
         params.append(room)
+    if is_warm_water is not None:
+        query += " AND w.is_warm_water = ?"
+        params.append(1 if is_warm_water else 0)
     
-    query += " ORDER BY w.date DESC, w.room"
+    query += " ORDER BY w.date DESC, w.room, w.is_warm_water"
     
     c.execute(query, params)
     rows = c.fetchall()
@@ -676,22 +759,26 @@ def update_water_reading(id: int, reading: WaterReadingInput) -> bool:
     conn = get_db_connection()
     c = conn.cursor()
     
-    total = (reading.warm_value or 0) + (reading.cold_value or 0)
-    total_value = total if total > 0 else None
+    # Get current reading to check if room/date changed
+    c.execute("SELECT room, date, is_warm_water FROM readings_water WHERE id = ?", (id,))
+    old_reading = c.fetchone()
     
     c.execute('''
         UPDATE readings_water 
-        SET date = ?, room = ?, warm_value = ?, cold_value = ?, total_value = ?, comment = ?
+        SET date = ?, room = ?, value = ?, is_warm_water = ?, comment = ?
         WHERE id = ?
-    ''', (reading.date, reading.room, reading.warm_value, 
-          reading.cold_value, total_value, reading.comment, id))
+    ''', (reading.date, reading.room, reading.value, reading.is_warm_water, reading.comment, id))
     
     updated = c.rowcount > 0
     conn.commit()
     
     if updated:
-        # Recalculate consumption
-        _calculate_water_consumption(conn, reading.room, reading.date)
+        # Recalculate consumption for new room/type
+        _calculate_water_consumption(conn, reading.room, reading.date, reading.is_warm_water)
+        
+        # If room or type changed, recalculate old room/type too
+        if old_reading and (old_reading['room'] != reading.room or old_reading['is_warm_water'] != reading.is_warm_water):
+            _calculate_water_consumption(conn, old_reading['room'], old_reading['date'], old_reading['is_warm_water'])
     
     conn.close()
     
@@ -703,7 +790,7 @@ def delete_water_reading(id: int) -> bool:
     c = conn.cursor()
     
     # Get reading info before deleting
-    c.execute("SELECT room, date FROM readings_water WHERE id = ?", (id,))
+    c.execute("SELECT room, date, is_warm_water FROM readings_water WHERE id = ?", (id,))
     reading = c.fetchone()
     
     c.execute("DELETE FROM readings_water WHERE id = ?", (id,))
@@ -711,13 +798,8 @@ def delete_water_reading(id: int) -> bool:
     conn.commit()
     
     if deleted and reading:
-        # Delete associated consumption calculations
-        period = reading['date'][:7]
-        c.execute('''
-            DELETE FROM consumption_calc 
-            WHERE period = ? AND entity_id = ? AND entity_type IN ('water_warm', 'water_cold', 'water_total')
-        ''', (period, reading['room']))
-        conn.commit()
+        # Recalculate consumption for this room and type
+        _calculate_water_consumption(conn, reading['room'], reading['date'], reading['is_warm_water'])
     
     conn.close()
     
@@ -931,7 +1013,7 @@ def reorganize_tables():
         c.execute('''
             CREATE TABLE readings_water_new AS
             SELECT * FROM readings_water
-            ORDER BY date DESC, room
+            ORDER BY date DESC, room, is_warm_water
         ''')
         c.execute('DROP TABLE readings_water')
         c.execute('ALTER TABLE readings_water_new RENAME TO readings_water')

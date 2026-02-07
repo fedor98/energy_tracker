@@ -41,25 +41,13 @@ export async function render(container, onComplete) {
             `).join('');
         } else if (step === 2) {
             title = 'Step 3: Water 💧';
-            // config.water is list of {room, has_warm, has_cold}
-            content = config.water.map(w => {
-                let html = `<div class="section-title" style="font-size: 1rem; border:none;">${w.room}</div>`;
-                if (w.has_cold) {
-                    html += `
-                    <div class="form-group">
-                        <label>Cold Water (m³)</label>
-                        <input type="number" step="0.001" class="reading-input" data-type="water" data-meter="${w.room}" data-channel="cold">
-                    </div>`;
-                }
-                if (w.has_warm) {
-                    html += `
-                    <div class="form-group">
-                        <label>Warm Water (m³)</label>
-                        <input type="number" step="0.001" class="reading-input" data-type="water" data-meter="${w.room}" data-channel="warm">
-                    </div>`;
-                }
-                return html;
-            }).join('');
+            // config.water is list of {room, is_warm_water}
+            content = config.water.map(w => `
+                <div class="form-group">
+                    <label>${w.room} ${w.is_warm_water ? '(Warm)' : '(Cold)'} Water (m³)</label>
+                    <input type="number" step="0.001" class="reading-input" data-type="water" data-meter="${w.room}" data-channel="${w.is_warm_water ? 'warm' : 'cold'}">
+                </div>
+            `).join('');
         } else if (step === 3) {
             title = 'Step 4: Gas 💨';
             // config.gas.rooms is list of rooms

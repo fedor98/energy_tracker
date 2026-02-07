@@ -60,42 +60,14 @@ def migrate_legacy_data():
                 ''', (actual_date, meter, value))
                 
             elif r_type == 'water':
-                # Water readings can have warm/cold channels
-                # Check if room already exists for this date
-                c.execute('''
-                    SELECT id, warm_value, cold_value FROM readings_water 
-                    WHERE date = ? AND room = ?
-                ''', (actual_date, meter))
-                existing = c.fetchone()
+                # Water readings now use is_warm_water flag
+                is_warm = (channel == 'warm')
                 
-                if existing:
-                    # Update existing row
-                    warm_val = existing['warm_value']
-                    cold_val = existing['cold_value']
-                    
-                    if channel == 'warm':
-                        warm_val = value
-                    elif channel == 'cold':
-                        cold_val = value
-                    
-                    total = (warm_val or 0) + (cold_val or 0)
-                    
-                    c.execute('''
-                        UPDATE readings_water 
-                        SET warm_value = ?, cold_value = ?, total_value = ?
-                        WHERE id = ?
-                    ''', (warm_val, cold_val, total if total > 0 else None, existing['id']))
-                else:
-                    # Insert new row
-                    warm_val = value if channel == 'warm' else None
-                    cold_val = value if channel == 'cold' else None
-                    total = (warm_val or 0) + (cold_val or 0)
-                    
-                    c.execute('''
-                        INSERT INTO readings_water 
-                        (date, room, warm_value, cold_value, total_value)
-                        VALUES (?, ?, ?, ?, ?)
-                    ''', (actual_date, meter, warm_val, cold_val, total if total > 0 else None))
+                c.execute('''
+                    INSERT OR REPLACE INTO readings_water 
+                    (date, room, value, is_warm_water)
+                    VALUES (?, ?, ?, ?)
+                ''', (actual_date, meter, value, is_warm))
         
         conn.commit()
         print(f"Successfully migrated {len(legacy_readings)} readings!")
@@ -262,31 +234,53 @@ def migrate_consumption_calc_values():
                     previous_value = previous_row['value']
                     
             elif entity_type in ['water_warm', 'water_cold', 'water_total']:
-                # Get current and previous values from readings_water
-                c.execute('''
-                    SELECT warm_value, cold_value FROM readings_water
-                    WHERE room = ? AND SUBSTR(date, 1, 7) = ?
-                    ORDER BY date DESC LIMIT 1
-                ''', (entity_id, period))
-                current_row = c.fetchone()
+                # Get current and previous values from readings_water (new structure)
+                if entity_type == 'water_warm':
+                    is_warm = 1
+                elif entity_type == 'water_cold':
+                    is_warm = 0
+                else:
+                    is_warm = None  # water_total
                 
-                c.execute('''
-                    SELECT warm_value, cold_value FROM readings_water
-                    WHERE room = ? AND date < ?
-                    ORDER BY date DESC LIMIT 1
-                ''', (entity_id, f"{period}-01"))
-                previous_row = c.fetchone()
-                
-                if current_row and previous_row:
-                    if entity_type == 'water_warm':
-                        current_value = current_row['warm_value']
-                        previous_value = previous_row['warm_value']
-                    elif entity_type == 'water_cold':
-                        current_value = current_row['cold_value']
-                        previous_value = previous_row['cold_value']
-                    elif entity_type == 'water_total':
-                        current_value = (current_row['warm_value'] or 0) + (current_row['cold_value'] or 0)
-                        previous_value = (previous_row['warm_value'] or 0) + (previous_row['cold_value'] or 0)
+                if is_warm is not None:
+                    # For warm or cold specific
+                    c.execute('''
+                        SELECT value FROM readings_water
+                        WHERE room = ? AND is_warm_water = ? AND SUBSTR(date, 1, 7) = ?
+                        ORDER BY date DESC LIMIT 1
+                    ''', (entity_id, is_warm, period))
+                    current_row = c.fetchone()
+                    
+                    c.execute('''
+                        SELECT value FROM readings_water
+                        WHERE room = ? AND is_warm_water = ? AND date < ?
+                        ORDER BY date DESC LIMIT 1
+                    ''', (entity_id, is_warm, f"{period}-01"))
+                    previous_row = c.fetchone()
+                    
+                    if current_row:
+                        current_value = current_row['value']
+                    if previous_row:
+                        previous_value = previous_row['value']
+                else:
+                    # For water_total - sum warm and cold
+                    c.execute('''
+                        SELECT is_warm_water, value FROM readings_water
+                        WHERE room = ? AND SUBSTR(date, 1, 7) = ?
+                        ORDER BY date DESC
+                    ''', (entity_id, period))
+                    current_rows = c.fetchall()
+                    
+                    c.execute('''
+                        SELECT is_warm_water, value FROM readings_water
+                        WHERE room = ? AND date < ?
+                        ORDER BY date DESC
+                    ''', (entity_id, f"{period}-01"))
+                    previous_rows = c.fetchall()
+                    
+                    # Sum all values for each date
+                    current_value = sum(r['value'] for r in current_rows) if current_rows else None
+                    previous_value = sum(r['value'] for r in previous_rows) if previous_rows else None
             
             # Update the entry with current and previous values
             c.execute('''

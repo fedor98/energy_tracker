@@ -39,15 +39,15 @@ export async function render(container, onComplete) {
         } else if (step === 2) {
             title = '💧 Water';
             content = `
-                <p class="text-sm" style="margin-bottom: 1rem;">Add rooms or taps (e.g., Kitchen, Bathroom).</p>
+                <p class="text-sm" style="margin-bottom: 1rem;">Add separate water meters for warm and cold water (e.g., "Kitchen Warm", "Kitchen Cold").</p>
                 <div class="form-group" style="background: #f9fafb; padding: 1rem; border-radius: 0.5rem;">
-                    <label>Add New Point</label>
-                    <input type="text" id="water-room" placeholder="Room Name" style="margin-bottom: 0.5rem;">
+                    <label>Add New Meter</label>
+                    <input type="text" id="water-room" placeholder="Meter Name (e.g., Kitchen)" style="margin-bottom: 0.5rem;">
                     <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-                        <label style="font-weight: normal; font-size: 0.9rem;"><input type="checkbox" id="water-warm" checked> Warm</label>
-                        <label style="font-weight: normal; font-size: 0.9rem;"><input type="checkbox" id="water-cold" checked> Cold</label>
+                        <label style="font-weight: normal; font-size: 0.9rem;"><input type="radio" name="water-type" id="water-warm" value="warm" checked> Warm Water</label>
+                        <label style="font-weight: normal; font-size: 0.9rem;"><input type="radio" name="water-type" id="water-cold" value="cold"> Cold Water</label>
                     </div>
-                    <button class="btn-secondary" id="btn-add-water" style="width: 100%;">+ Add Room</button>
+                    <button class="btn-secondary" id="btn-add-water" style="width: 100%;">+ Add Meter</button>
                 </div>
                 <div id="water-list" style="margin-top: 1rem;"></div>
             `;
@@ -108,10 +108,9 @@ export async function render(container, onComplete) {
             renderWaterList(container);
             container.querySelector('#btn-add-water').onclick = () => {
                 const room = container.querySelector('#water-room').value;
-                const warm = container.querySelector('#water-warm').checked;
-                const cold = container.querySelector('#water-cold').checked;
-                if (room && (warm || cold)) {
-                    state.water.push({ room, has_warm: warm, has_cold: cold });
+                const isWarm = container.querySelector('#water-warm').checked;
+                if (room) {
+                    state.water.push({ room, is_warm_water: isWarm });
                     renderStep(); // Re-render to clear inputs and update list
                 }
             };
@@ -142,7 +141,7 @@ export async function render(container, onComplete) {
         if (!list) return;
         list.innerHTML = state.water.map((w, i) => `
             <div class="setup-list-item">
-                <span style="font-weight: 500;">${w.room} <span style="font-weight: normal; color: var(--text-muted); font-size: 0.85rem;">(${w.has_warm ? 'Warm' : ''} ${w.has_cold ? 'Cold' : ''})</span></span>
+                <span style="font-weight: 500;">${w.room} <span style="font-weight: normal; color: var(--text-muted); font-size: 0.85rem;">(${w.is_warm_water ? 'Warm Water' : 'Cold Water'})</span></span>
                 <button class="btn-danger btn-sm" data-idx="${i}">Remove</button>
             </div>
         `).join('');

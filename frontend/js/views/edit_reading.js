@@ -129,43 +129,23 @@ export async function render(container, params) {
         if (data.water && data.water.length > 0) {
             waterContainer.innerHTML = data.water.map(r => `
                 <div class="form-section" data-id="${r.id}" data-type="water">
-                    <h4>${r.room}</h4>
+                    <h4>${r.room} ${r.is_warm_water ? '(Warm)' : '(Cold)'}</h4>
                     <div class="form-row">
                         <div class="form-group">
                             <label>Reading Date</label>
                             <input type="date" class="input-date" value="${r.date || ''}" data-field="date">
                         </div>
-                    </div>
-                    <div class="form-row">
                         <div class="form-group">
-                            <label>Warm Water (m³)</label>
-                            <input type="number" step="0.01" class="input-warm" value="${r.warm_value || ''}" data-field="warm_value" placeholder="No data">
-                        </div>
-                        <div class="form-group">
-                            <label>Cold Water (m³)</label>
-                            <input type="number" step="0.01" class="input-cold" value="${r.cold_value || ''}" data-field="cold_value" placeholder="No data">
+                            <label>Value (m³)</label>
+                            <input type="number" step="0.001" class="input-value" value="${r.value}" data-field="value" required>
                         </div>
                     </div>
-                    <div class="consumption-row">
-                        ${r.warm_consumption !== null ? `
-                            <div class="consumption-info">
-                                <span class="consumption-label">Warm:</span>
-                                <span class="consumption-value">${r.warm_consumption.toFixed(2)} m³</span>
-                            </div>
-                        ` : ''}
-                        ${r.cold_consumption !== null ? `
-                            <div class="consumption-info">
-                                <span class="consumption-label">Cold:</span>
-                                <span class="consumption-value">${r.cold_consumption.toFixed(2)} m³</span>
-                            </div>
-                        ` : ''}
-                        ${r.total_consumption !== null ? `
-                            <div class="consumption-info total">
-                                <span class="consumption-label">Total:</span>
-                                <span class="consumption-value">${r.total_consumption.toFixed(2)} m³</span>
-                            </div>
-                        ` : ''}
-                    </div>
+                    ${r.consumption !== null ? `
+                        <div class="consumption-info">
+                            <span class="consumption-label">Consumption:</span>
+                            <span class="consumption-value">${r.consumption.toFixed(2)} m³</span>
+                        </div>
+                    ` : ''}
                 </div>
             `).join('');
         } else {
@@ -356,9 +336,6 @@ export async function render(container, params) {
                     const id = parseInt(section.dataset.id);
                     const reading = data.water.find(r => r.id === id);
                     if (reading) {
-                        const warmInput = section.querySelector('.input-warm');
-                        const coldInput = section.querySelector('.input-cold');
-                        
                         updates.push({
                             type: 'water',
                             id: id,
@@ -366,8 +343,8 @@ export async function render(container, params) {
                                 period: period,
                                 date: section.querySelector('.input-date').value || null,
                                 room: reading.room,
-                                warm_value: warmInput.value ? parseFloat(warmInput.value) : null,
-                                cold_value: coldInput.value ? parseFloat(coldInput.value) : null
+                                value: parseFloat(section.querySelector('.input-value').value),
+                                is_warm_water: reading.is_warm_water
                             }
                         });
                     }
