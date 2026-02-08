@@ -1,4 +1,4 @@
-import { getElectricityReadings, getWaterReadings, getGasReadings, resetConfig } from '../api.js';
+import { getElectricityReadings, getWaterReadings, getGasReadings, resetConfig, getElectricityCalculations, getWaterCalculations, getGasCalculations } from '../api.js';
 
 export async function render(container) {
     container.innerHTML = `
@@ -22,6 +22,7 @@ export async function render(container) {
         <div class="card">
             <div class="dashboard-tabs">
                 <button class="btn-primary active" id="tab-consumption">Consumption 📈</button>
+                <button class="btn-secondary" id="tab-calc">Calc 🔢</button>
                 <button class="btn-secondary" id="tab-electricity">Electricity ⚡️</button>
                 <button class="btn-secondary" id="tab-water">Water 💧</button>
                 <button class="btn-secondary" id="tab-gas">Gas 💨</button>
@@ -55,7 +56,7 @@ export async function render(container) {
         }
     });
 
-    const tabs = ['consumption', 'electricity', 'water', 'gas'];
+    const tabs = ['consumption', 'calc', 'electricity', 'water', 'gas'];
     let currentTab = 'consumption';
 
     tabs.forEach(t => {
@@ -91,6 +92,7 @@ let cumulatedWater = true;
 async function loadData(container, tab = null) {
     if (!tab) {
         if (container.querySelector('#tab-consumption').classList.contains('active')) tab = 'consumption';
+        else if (container.querySelector('#tab-calc').classList.contains('active')) tab = 'calc';
         else if (container.querySelector('#tab-electricity').classList.contains('active')) tab = 'electricity';
         else if (container.querySelector('#tab-water').classList.contains('active')) tab = 'water';
         else if (container.querySelector('#tab-gas').classList.contains('active')) tab = 'gas';
@@ -108,6 +110,13 @@ async function loadData(container, tab = null) {
                 getGasReadings({ start, end })
             ]);
             renderChart(viewContainer, elecData, waterData, gasData, cumulatedWater);
+        } else if (tab === 'calc') {
+            const [elecCalc, waterCalc, gasCalc] = await Promise.all([
+                getElectricityCalculations(),
+                getWaterCalculations(),
+                getGasCalculations()
+            ]);
+            renderCalcTables(viewContainer, elecCalc, waterCalc, gasCalc);
         } else if (tab === 'electricity') {
             const data = await getElectricityReadings({ start, end });
             renderTable(viewContainer, data, tab);
@@ -303,4 +312,76 @@ function renderChart(container, elecData, waterData, gasData, cumulatedWater) {
             }
         }
     });
+}
+
+function renderCalcTables(container, elecCalc, waterCalc, gasCalc) {
+    let html = '';
+    
+    // Helper to render a table for one energy type
+    const renderTable = (title, icon, unit, calcData) => {
+        if (!calcData.periods || calcData.periods.length === 0) {
+            return `<div class="calc-section"><h3>${icon} ${title}</h3><p class="text-sm">No data available</p></div>`;
+        }
+        
+        // Get all unique meter names
+        const allMeters = new Set();
+        calcData.periods.forEach(p => {
+            p.meters.forEach(m => allMeters.add(m.entity_id));
+        });
+        const meterList = Array.from(allMeters).sort();
+        
+        let tableHtml = `<div class="calc-section"><h3>${icon} ${title}</h3>`;
+        tableHtml += '<table class="data-table"><thead><tr><th>Period</th>';
+        
+        // Header columns: Meter + Segs for each meter
+        meterList.forEach(meter => {
+            let displayMeter = meter;
+            // Transform water meter names: use emojis instead of text
+            if (title === 'Water') {
+                displayMeter = meter.replace(' (Warm)', ' 🔴').replace(' (Cold)', ' 🔵');
+            }
+            tableHtml += `<th>${displayMeter}</th><th class="seg-col">Segs</th>`;
+        });
+        
+        // Total column
+        tableHtml += '<th>Total</th></tr></thead><tbody>';
+        
+        // Rows by period
+        calcData.periods.forEach(periodData => {
+            tableHtml += `<tr><td>${periodData.period}</td>`;
+            
+            // Create a map of meter -> data for this period
+            const meterMap = {};
+            periodData.meters.forEach(m => {
+                meterMap[m.entity_id] = m;
+            });
+            
+            let periodTotal = 0;
+            
+            // Add cells for each meter (Consumption + Segs)
+            meterList.forEach(meter => {
+                const meterData = meterMap[meter];
+                if (meterData && meterData.consumption !== null) {
+                    periodTotal += meterData.consumption;
+                    tableHtml += `<td>${meterData.consumption.toFixed(2)} ${unit}</td><td class="seg-col">${meterData.segments}</td>`;
+                } else {
+                    tableHtml += `<td>-</td><td class="seg-col">-</td>`;
+                }
+            });
+            
+            // Total column
+            tableHtml += `<td><strong>${periodTotal.toFixed(2)} ${unit}</strong></td>`;
+            tableHtml += '</tr>';
+        });
+        
+        tableHtml += '</tbody></table></div>';
+        return tableHtml;
+    };
+    
+    // Render all three tables
+    html += renderTable('Electricity', '⚡️', 'kWh', elecCalc);
+    html += renderTable('Water', '💧', 'm³', waterCalc);
+    html += renderTable('Gas', '💨', 'm³', gasCalc);
+    
+    container.innerHTML = html;
 }

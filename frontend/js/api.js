@@ -212,3 +212,22 @@ export async function reorganizeDatabase() {
     if (!res.ok) throw new Error('Failed to reorganize database');
     return res.json();
 }
+
+// Calculation Details API
+export async function getElectricityCalculations() {
+    const res = await fetch(`${API_BASE}/calculations/electricity`);
+    if (!res.ok) throw new Error('Failed to fetch electricity calculations');
+    return res.json();
+}
+
+export async function getWaterCalculations() {
+    const res = await fetch(`${API_BASE}/calculations/water`);
+    if (!res.ok) throw new Error('Failed to fetch water calculations');
+    return res.json();
+}
+
+export async function getGasCalculations() {
+    const res = await fetch(`${API_BASE}/calculations/gas`);
+    if (!res.ok) throw new Error('Failed to fetch gas calculations');
+    return res.json();
+}

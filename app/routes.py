@@ -31,7 +31,8 @@ from .db import (
     delete_electricity_reading,
     delete_water_reading,
     delete_gas_reading,
-    get_monthly_readings
+    get_monthly_readings,
+    get_calculation_details_by_type
 )
 from .migration import migrate_legacy_data, check_migration_needed, get_migration_status
 
@@ -300,3 +301,72 @@ def reorganize_database():
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Reorganization failed: {str(e)}")
+
+# Calculation Details Endpoints
+@router.get("/calculations/electricity")
+def get_electricity_calculations():
+    """Get electricity consumption calculations grouped by period."""
+    return get_calculation_details_by_type('electricity')
+
+@router.get("/calculations/water")
+def get_water_calculations():
+    """Get water consumption calculations grouped by period."""
+    warm_data = get_calculation_details_by_type('water_warm')
+    cold_data = get_calculation_details_by_type('water_cold')
+    total_data = get_calculation_details_by_type('water_total')
+    
+    # Combine all water types
+    all_periods = set()
+    for p in warm_data['periods']:
+        all_periods.add(p['period'])
+    for p in cold_data['periods']:
+        all_periods.add(p['period'])
+    for p in total_data['periods']:
+        all_periods.add(p['period'])
+    
+    # Build result with all meters per period
+    result_periods = []
+    for period in sorted(all_periods, reverse=True):
+        meters = []
+        
+        # Add warm water meters
+        for p in warm_data['periods']:
+            if p['period'] == period:
+                for m in p['meters']:
+                    meters.append({
+                        'entity_id': f"{m['entity_id']} (Warm)",
+                        'consumption': m['consumption'],
+                        'segments': m['segments']
+                    })
+        
+        # Add cold water meters
+        for p in cold_data['periods']:
+            if p['period'] == period:
+                for m in p['meters']:
+                    meters.append({
+                        'entity_id': f"{m['entity_id']} (Cold)",
+                        'consumption': m['consumption'],
+                        'segments': m['segments']
+                    })
+        
+        # Add total consumption (as separate info)
+        for p in total_data['periods']:
+            if p['period'] == period:
+                for m in p['meters']:
+                    meters.append({
+                        'entity_id': f"{m['entity_id']} (Total)",
+                        'consumption': m['consumption'],
+                        'segments': m['segments']
+                    })
+        
+        result_periods.append({
+            'period': period,
+            'meters': meters
+        })
+    
+    return {'periods': result_periods}
+
+@router.get("/calculations/gas")
+def get_gas_calculations():
+    """Get gas consumption calculations grouped by period."""
+    return get_calculation_details_by_type('gas')

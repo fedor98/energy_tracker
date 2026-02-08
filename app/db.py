@@ -971,6 +971,65 @@ def get_monthly_readings(period: str) -> Dict[str, List[Dict[str, Any]]]:
         'gas': get_gas_readings(start_period=period, end_period=period)
     }
 
+
+def get_calculation_details_by_type(entity_type: str) -> Dict[str, Any]:
+    """
+    Get calculation details grouped by period for a specific entity type.
+    Returns periods with all meters and their consumption/segment counts.
+    
+    entity_type: 'electricity', 'gas', 'water_warm', 'water_cold', or 'water_total'
+    """
+    import json
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    # Get all calculations for this entity type
+    c.execute('''
+        SELECT period, entity_id, consumption_value, calculation_details
+        FROM consumption_calc
+        WHERE entity_type = ?
+        ORDER BY period DESC, entity_id
+    ''', (entity_type,))
+    
+    rows = c.fetchall()
+    conn.close()
+    
+    # Group by period
+    periods = {}
+    for row in rows:
+        period = row['period']
+        if period not in periods:
+            periods[period] = []
+        
+        # Parse calculation_details to get segment count
+        segment_count = 0
+        if row['calculation_details']:
+            try:
+                calc_details = json.loads(row['calculation_details'])
+                segment_count = calc_details.get('segment_count', 0)
+            except:
+                pass
+        
+        periods[period].append({
+            'entity_id': row['entity_id'],
+            'consumption': row['consumption_value'],
+            'segments': segment_count
+        })
+    
+    # Convert to sorted list
+    sorted_periods = sorted(periods.keys(), reverse=True)
+    result = {
+        'periods': [
+            {
+                'period': period,
+                'meters': periods[period]
+            }
+            for period in sorted_periods
+        ]
+    }
+    
+    return result
+
 def backup_and_reset_db():
     import datetime
     import shutil
