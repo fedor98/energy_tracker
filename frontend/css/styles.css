@@ -242,8 +242,14 @@ button {
 }
 
 .data-table {
-    width: 100%;
-    border-collapse: collapse;
+    width: auto;
+    min-width: unset;
+    white-space: nowrap;
+}
+
+.data-table th,
+.data-table td {
+    padding: 0.5rem 1rem;
     white-space: nowrap;
 }
 
@@ -942,8 +948,19 @@ select {
 }
 
 /* ============================================
-   ERROR & SUCCESS STATES
-   ============================================ */
+    MONTH GROUP RENDERING
+    ============================================ */
+
+.month-divider td {
+    padding: 0;
+    height: 0;
+    border-top: 2px solid #d1d5db;
+    transform: translateY(-4px);
+}
+
+/* ============================================
+    ERROR & SUCCESS STATES
+    ============================================ */
 
 .error {
     color: var(--danger-color);

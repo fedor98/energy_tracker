@@ -112,45 +112,66 @@ async function loadData(container, tab = null) {
 }
 
 function renderTable(container, data, type) {
-    if (data.length === 0) {
-        container.innerHTML = '<p>No data found for this period.</p>';
-        return;
-    }
-
     const unit = type === 'electricity' ? 'kWh' : 'm³';
+    
+    const grouped = {};
+    data.forEach(row => {
+        const period = row.period;
+        if (!grouped[period]) grouped[period] = [];
+        grouped[period].push(row);
+    });
+    
+    const sortedPeriods = Object.keys(grouped).sort().reverse();
     
     let html = '<table class="data-table"><thead><tr>';
     
     if (type === 'electricity') {
-        html += '<th>Period</th><th>Date</th><th>Meter</th><th>Value</th>';
+        html += '<th>Date</th><th>Meter</th><th>Value</th>';
     } else if (type === 'water') {
-        html += '<th>Period</th><th>Date</th><th>Meter</th><th>Value (m³)</th>';
+        html += '<th>Date</th><th>Meter</th><th>Value (m³)</th>';
     } else {
-        html += '<th>Period</th><th>Date</th><th>Room</th><th>Value</th>';
+        html += '<th>Date</th><th>Room</th><th>Value</th>';
     }
     
     html += '</tr></thead><tbody>';
-
-    data.forEach(row => {
-        html += '<tr>';
-        html += `<td>${row.period}</td>`;
-        html += `<td>${row.date || '-'}</td>`;
+    
+    sortedPeriods.forEach(period => {
+        const rows = grouped[period];
         
-        if (type === 'electricity') {
-            html += `<td>${row.meter_name || row.meter || '-'}</td>`;
-            html += `<td>${row.value !== null ? row.value.toFixed(2) : '-'} ${unit}</td>`;
-        } else if (type === 'water') {
-            const emoji = row.is_warm_water ? '🔴' : '🔵';
-            html += `<td>${emoji} ${row.room || row.meter || '-'}</td>`;
-            html += `<td>${row.value !== null ? row.value.toFixed(2) : '-'} ${unit}</td>`;
-        } else {
-            html += `<td>${row.room || row.meter || '-'}</td>`;
-            html += `<td>${row.value !== null ? row.value.toFixed(2) : '-'} ${unit}</td>`;
-        }
+        rows.sort((a, b) => {
+            const keyA = (a.room || a.meter_name || a.meter || '').toLowerCase();
+            const keyB = (b.room || b.meter_name || b.meter || '').toLowerCase();
+            return keyA.localeCompare(keyB);
+        });
         
-        html += '</tr>';
+        let firstInMonth = true;
+        rows.forEach(row => {
+            if (firstInMonth) {
+                html += `<tr>`;
+                firstInMonth = false;
+            } else {
+                html += '<tr>';
+            }
+            html += `<td>${row.date || '-'}</td>`;
+            
+            if (type === 'electricity') {
+                html += `<td>${row.meter_name || row.meter || '-'}</td>`;
+                html += `<td>${row.value !== null ? row.value.toFixed(2) : '-'} ${unit}</td>`;
+            } else if (type === 'water') {
+                const emoji = row.is_warm_water ? '🔴' : '🔵';
+                html += `<td>${emoji} ${row.room || row.meter || '-'}</td>`;
+                html += `<td>${row.value !== null ? row.value.toFixed(2) : '-'} ${unit}</td>`;
+            } else {
+                html += `<td>${row.room || row.meter || '-'}</td>`;
+                html += `<td>${row.value !== null ? row.value.toFixed(2) : '-'} ${unit}</td>`;
+            }
+            
+            html += '</tr>';
+        });
+        
+        html += `<tr class="month-divider"><td colspan="3"></td></tr>`;
     });
-
+    
     html += '</tbody></table>';
     container.innerHTML = html;
 }
