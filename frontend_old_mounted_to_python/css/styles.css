@@ -242,8 +242,14 @@ button {
 }
 
 .data-table {
-    width: 100%;
-    border-collapse: collapse;
+    width: auto;
+    min-width: unset;
+    white-space: nowrap;
+}
+
+.data-table th,
+.data-table td {
+    padding: 0.5rem 1rem;
     white-space: nowrap;
 }
 
@@ -271,6 +277,59 @@ button {
 
 .data-table tr:last-child td {
     border-bottom: none;
+}
+
+/* ============================================
+   CALC SECTION STYLES
+   ============================================ */
+
+.calc-section {
+    margin-bottom: 2rem;
+}
+
+.calc-section:last-child {
+    margin-bottom: 0;
+}
+
+.calc-section h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--primary-color);
+    color: var(--text-main);
+}
+
+/* Segments column styling */
+.seg-col {
+    text-align: center;
+    width: 60px;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    background-color: #f9fafb;
+}
+
+/* Make calc tables scrollable on mobile */
+.calc-section .data-table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+    .calc-section {
+        margin-bottom: 1.5rem;
+    }
+    
+    .calc-section h3 {
+        font-size: 1rem;
+        margin-bottom: 0.75rem;
+    }
+    
+    .seg-col {
+        width: 50px;
+        font-size: 0.8rem;
+    }
 }
 
 /* Setup Items */
@@ -342,19 +401,28 @@ button {
     margin-bottom: 1rem;
 }
 
-#tab-consumption {
-    margin-right: auto;
+/* Desktop: Consumption + Calc left, others right */
+#tab-electricity {
+    margin-left: auto;
 }
 
 @media (max-width: 640px) {
-    #tab-consumption {
-        width: 100%;
-        order: -1;
-        /* Ensure it is visually first */
-        margin-right: 0;
+    /* Row 1: Consumption and Calc */
+    #tab-consumption,
+    #tab-calc {
+        flex: 1;
+        order: -2;
+        width: auto;
         margin-bottom: 0.5rem;
     }
+    
+    /* Reset margin for mobile */
+    #tab-electricity {
+        margin-left: 0;
+    }
 
+    /* Row 2: Other three tabs */
+    #tab-calc,
     #tab-electricity,
     #tab-water,
     #tab-gas {
@@ -362,6 +430,11 @@ button {
         text-align: center;
         padding: 0.5rem;
         font-size: 0;
+    }
+
+    #tab-calc::after {
+        content: "🔢";
+        font-size: 1.2rem;
     }
 
     #tab-electricity::after {
@@ -407,6 +480,26 @@ select {
     appearance: none;
     background-color: #fff;
     /* Ensure background is solid */
+}
+
+input[type="radio"] {
+    appearance: radio;
+    -webkit-appearance: radio;
+    -moz-appearance: radio;
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    margin: 0;
+}
+
+input[type="checkbox"] {
+    appearance: checkbox;
+    -webkit-appearance: checkbox;
+    -moz-appearance: checkbox;
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    margin: 0;
 }
 
 /* ============================================
@@ -942,8 +1035,19 @@ select {
 }
 
 /* ============================================
-   ERROR & SUCCESS STATES
-   ============================================ */
+    MONTH GROUP RENDERING
+    ============================================ */
+
+.month-divider td {
+    padding: 0;
+    height: 0;
+    border-top: 2px solid #d1d5db;
+    transform: translateY(-4px);
+}
+
+/* ============================================
+    ERROR & SUCCESS STATES
+    ============================================ */
 
 .error {
     color: var(--danger-color);

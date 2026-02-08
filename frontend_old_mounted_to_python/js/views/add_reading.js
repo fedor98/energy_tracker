@@ -35,26 +35,26 @@ export async function render(container, onComplete) {
             title = 'Step 2: Electricity ⚡️';
             content = config.electricity.meters.map((m, i) => `
                 <div class="form-group">
-                    <label>${m} (kWh)</label>
-                    <input type="number" step="0.01" class="reading-input" data-type="electricity" data-meter="${m}" data-channel="default">
+                    <label>${m.name} (kWh)</label>
+                    <input type="number" step="0.01" class="reading-input" data-type="electricity" data-meter="${m.name}" data-meter-id="${m.meter_id}" data-channel="default">
                 </div>
             `).join('');
         } else if (step === 2) {
             title = 'Step 3: Water 💧';
-            // config.water is list of {room, is_warm_water}
-            content = config.water.map(w => `
+            const waterMeters = config.water?.meters || (Array.isArray(config.water) ? config.water : []);
+            content = waterMeters.map(w => `
                 <div class="form-group">
-                    <label>${w.room} ${w.is_warm_water ? '(Warm)' : '(Cold)'} Water (m³)</label>
-                    <input type="number" step="0.001" class="reading-input" data-type="water" data-meter="${w.room}" data-channel="${w.is_warm_water ? 'warm' : 'cold'}">
+                    <label>${w.room} ${w.is_warm_water ? '(Hot)' : '(Cold)'} Water (m³)</label>
+                    <input type="number" step="0.001" class="reading-input" data-type="water" data-meter="${w.room}" data-meter-id="${w.meter_id}" data-channel="${w.is_warm_water ? 'warm' : 'cold'}">
                 </div>
             `).join('');
         } else if (step === 3) {
             title = 'Step 4: Gas 💨';
-            // config.gas.rooms is list of rooms
-            content = config.gas.rooms.map(r => `
+            // config.gas.meters is list of {room, meter_id}
+            content = config.gas.meters.map(m => `
                 <div class="form-group">
-                    <label>${r} Heater (m³ / units)</label>
-                    <input type="number" step="0.01" class="reading-input" data-type="gas" data-meter="${r}" data-channel="default">
+                    <label>${m.room} Heater (m³ / units)</label>
+                    <input type="number" step="0.01" class="reading-input" data-type="gas" data-meter="${m.room}" data-meter-id="${m.meter_id}" data-channel="default">
                 </div>
             `).join('');
         }
@@ -106,6 +106,7 @@ export async function render(container, onComplete) {
                             date: date,
                             type: input.dataset.type,
                             meter: input.dataset.meter,
+                            meter_id: input.dataset.meterId || null,
                             channel: input.dataset.channel,
                             value: value
                         });

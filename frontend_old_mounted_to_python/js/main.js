@@ -128,7 +128,7 @@ window.addEventListener('popstate', router);
 async function init() {
     try {
         const config = await getConfig();
-        if (!config || (config.gas.rooms.length === 0 && config.water.length === 0 && config.electricity.meters.length === 0)) {
+        if (!config || (config.gas.meters.length === 0 && config.water.meters.length === 0 && config.electricity.meters.length === 0)) {
             // Not setup
             if (window.location.pathname !== '/setup') {
                 navigateTo('/setup');
