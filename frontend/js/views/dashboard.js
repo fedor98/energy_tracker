@@ -27,10 +27,12 @@ export async function render(container) {
                 <button class="btn-secondary" id="tab-water">Water 💧</button>
                 <button class="btn-secondary" id="tab-gas">Gas 💨</button>
             </div>
-            <label style="display: inline-flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0; cursor: pointer; white-space: nowrap; font-size: 0.875rem; min-height: 24px;">
-                <input type="checkbox" id="chk-cumulated-water" checked style="cursor: pointer;">
-                Cumulated Water
-            </label>
+            <div id="cumulated-water-container" style="display: inline-flex;">
+                <label style="display: inline-flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0; cursor: pointer; white-space: nowrap; font-size: 0.875rem; min-height: 24px;">
+                    <input type="checkbox" id="chk-cumulated-water" checked style="cursor: pointer;">
+                    Cumulated Water
+                </label>
+            </div>
             <div id="view-container" style="overflow-x: auto;"></div>
         </div>
     `;
@@ -71,6 +73,13 @@ export async function render(container) {
             tabBtn.classList.add('btn-primary', 'active');
 
             currentTab = t;
+            
+            // Show/hide cumulated water checkbox based on tab
+            const cumulatedWaterContainer = container.querySelector('#cumulated-water-container');
+            if (cumulatedWaterContainer) {
+                cumulatedWaterContainer.style.display = t === 'consumption' ? 'inline-flex' : 'none';
+            }
+            
             loadData(container, currentTab);
         });
     });
@@ -82,6 +91,12 @@ export async function render(container) {
 
     container.querySelector('#filter-start').value = startStr;
     container.querySelector('#filter-end').value = endStr;
+
+    // Ensure cumulated water checkbox is visible on initial load (consumption tab)
+    const cumulatedWaterContainer = container.querySelector('#cumulated-water-container');
+    if (cumulatedWaterContainer) {
+        cumulatedWaterContainer.style.display = 'inline-flex';
+    }
 
     loadData(container, 'consumption');
 }
