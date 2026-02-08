@@ -2,7 +2,7 @@ import sqlite3
 import json
 import os
 from typing import List, Optional, Dict, Any
-from .models import AppConfig, ElectricityReadingInput, WaterReadingInput, GasReadingInput
+from models import AppConfig, ElectricityReadingInput, WaterReadingInput, GasReadingInput
 
 DB_PATH = "/app/data/energy.sqlite"
 

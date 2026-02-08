@@ -6,7 +6,7 @@ Run this once to migrate from old 'readings' table to new structure.
 import sqlite3
 import os
 from typing import List, Dict, Any
-from .db import get_db_connection, DB_PATH
+from db import get_db_connection, DB_PATH
 
 def migrate_legacy_data():
     """

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
-from .models import (
+from models import (
     AppConfig, 
     ReadingInput, 
     ElectricityReadingInput,
@@ -11,7 +11,7 @@ from .models import (
     GasReading,
     MonthlyReadings
 )
-from .db import (
+from db import (
     get_config, 
     save_config, 
     backup_and_reset_db,
@@ -33,7 +33,7 @@ from .db import (
     delete_gas_reading,
     get_monthly_readings
 )
-from .migration import migrate_legacy_data, check_migration_needed, get_migration_status
+from migration import migrate_legacy_data, check_migration_needed, get_migration_status
 
 router = APIRouter()
 
