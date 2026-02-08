@@ -49,8 +49,8 @@ services:
       # "expose" makes the port accessible in the Compose network, but NOT published to the host.
       - "8000"
     volumes:
-      - ./data:/app/data/
-      - ./:/app/
+      - ./backend/data:/app/data/
+      - ./backend:/app
     # Optional (nur wenn du lokal direkt aufs Backend willst):
     # ports:
     #   - "8000:8000"
