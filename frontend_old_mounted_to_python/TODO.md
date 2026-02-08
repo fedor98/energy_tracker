@@ -1,39 +1,58 @@
 # TODO - Frontend Migration
 
-## In Bearbeitung
-- [ ] **Phase 1: Setup & Foundation**
-  - [x] Chart.js installieren
-  - [x] API-Layer erstellen (`frontend/app/lib/api.ts`)
-  - [x] UI-Komponenten-Struktur aufsetzen
-    - [x] Button-Komponente
-    - [x] Card-Komponente
-    - [x] Input-Komponente
-    - [x] Table-Komponente
-    - [x] Tabs-Komponente
+## Abgeschlossen ✅
 
-## Offen - Phase 1: Setup & Foundation
-- [ ] Chart.js installieren (`npm install chart.js @types/chart.js`)
-- [ ] API-Layer erstellen (`frontend/app/lib/api.ts`)
-- [ ] UI-Komponenten-Struktur aufsetzen
-  - [ ] Button-Komponenten
-  - [ ] Card-Komponente
-  - [ ] Input-Komponenten
-  - [ ] Table-Komponente
+### Phase 1: Setup & Foundation
+- [x] Chart.js installieren
+- [x] API-Layer erstellen (`frontend/app/lib/api.ts`)
+- [x] UI-Komponenten-Struktur aufsetzen
+  - [x] Button-Komponente
+  - [x] Card-Komponente
+  - [x] Input-Komponente
+  - [x] Table-Komponente
+  - [x] Tabs-Komponente
 
-## Offen - Phase 2: Core Routes
+### Phase 2: Dashboard Layout
+- [x] Dashboard Route erstellen (`/`)
+- [x] Responsive Layout (Mobile + Desktop)
+- [x] Filter-Section (Start/End Month)
+- [x] Tab-Navigation mit korrektem Layout:
+  - [x] 5 Tabs: Consumption, Calc, Electricity, Water, Gas
+  - [x] Desktop: Consumption & Calc links, Rest rechts
+  - [x] Mobile: 2 Zeilen (Consumption/Calc | Electricity/Water/Gas)
+  - [x] Englische Tab-Namen
+  - [x] Tabs nur oben abgerundet
+- [x] Cumulated Water Checkbox (nur in Consumption Tab)
+- [x] Skeleton Loading States
+- [x] Error Handling
+- [x] Header mit Indigo-Farben
+
+## In Bearbeitung 🔄
+
+### Phase 2: Dashboard Tab-Inhalte
+- [ ] **Tab: Consumption** 
+  - [ ] Chart.js Line-Chart
+  - [ ] 3 Datasets (Electricity, Water, Gas)
+  - [ ] Responsive Chart-Container
+- [ ] **Tab: Electricity**
+  - [ ] Data Table
+  - [ ] Columns: Period, Date, Meter, Value, Consumption
+- [ ] **Tab: Water**
+  - [ ] Data Table
+  - [ ] Warm/Cold Indikator (🔴/🔵)
+- [ ] **Tab: Gas**
+  - [ ] Data Table
+  - [ ] Columns: Period, Date, Room, Value, Consumption
+
+## Offen 📋
+
+### Phase 2: Core Routes (Fortsetzung)
 - [ ] **Setup-Wizard** (`/setup`)
   - [ ] Step 0: Intro/Welcome
   - [ ] Step 1: Electricity Konfiguration
   - [ ] Step 2: Water Konfiguration
   - [ ] Step 3: Gas Konfiguration
   - [ ] Speichern der Config
-- [ ] **Dashboard** (`/`)
-  - [ ] Filter (Start/End Month)
-  - [ ] Tab: Consumption (Chart.js)
-  - [ ] Tab: Electricity (Table)
-  - [ ] Tab: Water (Table)
-  - [ ] Tab: Gas (Table)
-  - [ ] Reset App Data Button
 - [ ] **Add Reading** (`/add`)
   - [ ] Step 1: Date Selection
   - [ ] Step 2: Electricity Readings
@@ -41,26 +60,24 @@
   - [ ] Step 4: Gas Readings
   - [ ] Speichern der Readings
 
-## Offen - Phase 3: Additional Routes
+### Phase 3: Additional Routes
 - [ ] **Edit Reading** (`/edit/:period`)
   - [ ] Bestehende Readings laden
   - [ ] Bearbeiten & Speichern
 - [ ] **Settings** (`/settings`)
   - [ ] Config anzeigen
-  - [ ] Reset-Funktion
+  - [ ] Reset-Funktion (von Dashboard hierher verschoben)
 
-## Offen - Phase 4: Navigation & Layout
+### Phase 4: Navigation & Layout
 - [ ] Header mit Navigation
 - [ ] Aktive Route hervorheben
 - [ ] Setup-Redirect Logik (wenn keine Config)
-- [ ] Responsive Design
+- [ ] Responsive Design (final check)
 
-## Offen - Phase 5: Testing & Polish
+### Phase 5: Testing & Polish
 - [ ] API-Integration testen
 - [ ] Error Boundaries
-- [ ] Loading States
 - [ ] Form-Validierung
-- [ ] Mobile Responsiveness
 
 ## Legacy-Referenzdateien
 
