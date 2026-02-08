@@ -4,7 +4,7 @@ from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 from .db import init_db
 from .routes import router
-from .migration import check_migration_needed, migrate_legacy_data, check_consumption_calc_migration_needed, migrate_consumption_calc_values, check_meter_id_migration_needed, migrate_meter_ids_if_needed, migrate_consumption_calc_meter_ids, check_consumption_calc_meter_id_migration_needed
+# from .migration import 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

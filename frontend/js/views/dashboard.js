@@ -22,19 +22,30 @@ export async function render(container) {
         <div class="card">
             <div class="dashboard-tabs">
                 <button class="btn-primary active" id="tab-consumption">Consumption 📈</button>
-                <button class="btn-secondary" id="tab-electricity">Strom ⚡️</button>
-                <button class="btn-secondary" id="tab-water">Wasser 💧</button>
+                <button class="btn-secondary" id="tab-electricity">Electricity ⚡️</button>
+                <button class="btn-secondary" id="tab-water">Water 💧</button>
                 <button class="btn-secondary" id="tab-gas">Gas 💨</button>
             </div>
+            <label style="display: inline-flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0; cursor: pointer; white-space: nowrap; font-size: 0.875rem; min-height: 24px;">
+                <input type="checkbox" id="chk-cumulated-water" checked style="cursor: pointer;">
+                Cumulated Water
+            </label>
             <div id="view-container" style="overflow-x: auto;"></div>
         </div>
     `;
+
+    cumulatedWater = true;
 
     container.querySelector('#btn-filter').addEventListener('click', () => loadData(container));
     container.querySelector('#btn-reset-filters').addEventListener('click', () => {
         container.querySelector('#filter-start').value = '';
         container.querySelector('#filter-end').value = '';
         loadData(container);
+    });
+
+    container.querySelector('#chk-cumulated-water').addEventListener('change', (e) => {
+        cumulatedWater = e.target.checked;
+        loadData(container, currentTab);
     });
 
     container.querySelector('#btn-app-reset').addEventListener('click', async () => {
@@ -75,6 +86,7 @@ export async function render(container) {
 }
 
 let chartInstance = null;
+let cumulatedWater = true;
 
 async function loadData(container, tab = null) {
     if (!tab) {
@@ -95,7 +107,7 @@ async function loadData(container, tab = null) {
                 getWaterReadings({ start, end }),
                 getGasReadings({ start, end })
             ]);
-            renderChart(viewContainer, elecData, waterData, gasData);
+            renderChart(viewContainer, elecData, waterData, gasData, cumulatedWater);
         } else if (tab === 'electricity') {
             const data = await getElectricityReadings({ start, end });
             renderTable(viewContainer, data, tab);
@@ -176,7 +188,7 @@ function renderTable(container, data, type) {
     container.innerHTML = html;
 }
 
-function renderChart(container, elecData, waterData, gasData) {
+function renderChart(container, elecData, waterData, gasData, cumulatedWater) {
     if (chartInstance) {
         chartInstance.destroy();
         chartInstance = null;
@@ -195,6 +207,8 @@ function renderChart(container, elecData, waterData, gasData) {
     const datasets = {
         electricity: {},
         water: {},
+        water_warm: {},
+        water_cold: {},
         gas: {}
     };
 
@@ -203,17 +217,19 @@ function renderChart(container, elecData, waterData, gasData) {
     function processData(data, type) {
         data.forEach(row => {
             if (row.period) {
-                if (!datasets[type][row.period]) datasets[type][row.period] = 0;
-                
                 if (type === 'water') {
                     if (row.total_water_consumption !== undefined) {
-                        datasets[type][row.period] += row.total_water_consumption || 0;
+                        datasets[type][row.period] = (datasets[type][row.period] || 0) + (row.total_water_consumption || 0);
+                        if (row.is_warm_water) {
+                            datasets.water_warm[row.period] = (datasets.water_warm[row.period] || 0) + (row.total_water_consumption || 0);
+                        } else {
+                            datasets.water_cold[row.period] = (datasets.water_cold[row.period] || 0) + (row.total_water_consumption || 0);
+                        }
                         allPeriods.add(row.period);
                     }
                 } else {
-                    // Only include if calculation_details exist (meaning it was actually calculated)
                     if (row.calculation_details) {
-                        datasets[type][row.period] += row.consumption || 0;
+                        datasets[type][row.period] = (datasets[type][row.period] || 0) + (row.consumption || 0);
                         allPeriods.add(row.period);
                     }
                 }
@@ -227,31 +243,51 @@ function renderChart(container, elecData, waterData, gasData) {
 
     const sortedPeriods = Array.from(allPeriods).sort();
 
+    const chartDatasets = [
+        {
+            label: 'Electricity (kWh)',
+            data: sortedPeriods.map(p => datasets.electricity[p] || 0),
+            borderColor: '#f1c40f',
+            backgroundColor: 'rgba(241, 196, 15, 0.2)',
+            tension: 0.1
+        },
+        {
+            label: 'Gas (m³)',
+            data: sortedPeriods.map(p => datasets.gas[p] || 0),
+            borderColor: '#27ae60',
+            backgroundColor: 'rgba(39, 174, 96, 0.2)',
+            tension: 0.1
+        }
+    ];
+
+    if (cumulatedWater) {
+        chartDatasets.push({
+            label: 'Water (m³)',
+            data: sortedPeriods.map(p => datasets.water[p] || 0),
+            borderColor: '#3498db',
+            backgroundColor: 'rgba(52, 152, 219, 0.2)',
+            tension: 0.1
+        });
+    } else {
+        chartDatasets.push({
+            label: 'Warm Water (m³)',
+            data: sortedPeriods.map(p => datasets.water_warm[p] || 0),
+            borderColor: '#e74c3c',
+            backgroundColor: 'rgba(231, 76, 60, 0.2)',
+            tension: 0.1
+        });
+        chartDatasets.push({
+            label: 'Cold Water (m³)',
+            data: sortedPeriods.map(p => datasets.water_cold[p] || 0),
+            borderColor: '#3498db',
+            backgroundColor: 'rgba(52, 152, 219, 0.2)',
+            tension: 0.1
+        });
+    }
+
     const chartData = {
         labels: sortedPeriods,
-        datasets: [
-            {
-                label: 'Electricity (kWh)',
-                data: sortedPeriods.map(p => datasets.electricity[p] || 0),
-                borderColor: '#f1c40f',
-                backgroundColor: 'rgba(241, 196, 15, 0.2)',
-                tension: 0.1
-            },
-            {
-                label: 'Water (m³)',
-                data: sortedPeriods.map(p => datasets.water[p] || 0),
-                borderColor: '#3498db',
-                backgroundColor: 'rgba(52, 152, 219, 0.2)',
-                tension: 0.1
-            },
-            {
-                label: 'Gas (m³)',
-                data: sortedPeriods.map(p => datasets.gas[p] || 0),
-                borderColor: '#e74c3c',
-                backgroundColor: 'rgba(231, 76, 60, 0.2)',
-                tension: 0.1
-            }
-        ]
+        datasets: chartDatasets
     };
 
     chartInstance = new Chart(ctx, {
