@@ -29,3 +29,12 @@ env.bak/
 venv.bak/
 .idea/
 .vscode/
+
+
+.env
+node_modules/
+
+# React Router
+.react-router/
+build/
+

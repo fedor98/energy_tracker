@@ -1,11 +1,57 @@
 services:
-  app:
-    build: .
-    container_name: energy_tracker
+  # app:
+  #   build: .
+  #   container_name: energy_tracker
+  #   ports:
+  #     - "8000:8000"
+  #   volumes:
+  #     - ./data:/app/data
+  #     - ./frontend:/app/frontend
+  #     - ./app:/app/app
+  #   restart: unless-stopped
+
+  frontend-dev:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development-dependencies-env
+    container_name: energy_tracker-frontend-dev
     ports:
-      - "8000:8000"
+      # Host-Port 8080 -> Container-Port 80 (Nginx)
+      # Only the frontend/Nginx is published to the outside.
+      - "8080:80"
     volumes:
-      - ./data:/app/data
-      - ./frontend:/app/frontend
-      - ./app:/app/app
+      - ./frontend/app:/app
+      - ./frontend/node_modules
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  frontend-prod:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: final
+    container_name: energy_tracker-frontend-prod
+    ports:
+      # Host-Port 8080 -> Container-Port 80 (Nginx)
+      # Only the frontend/Nginx is published to the outside.
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    container_name: energy_tracker-backend
+    expose:
+      # "expose" makes the port accessible in the Compose network, but NOT published to the host.
+      - "8000"
+    volumes:
+      - ./data:/app/data/
+      - ./:/app/
+    # Optional (nur wenn du lokal direkt aufs Backend willst):
+    # ports:
+    #   - "8000:8000"
     restart: unless-stopped
