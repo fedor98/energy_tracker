@@ -185,13 +185,8 @@ function renderChart(container, elecData, waterData, gasData) {
                 if (!datasets[type][row.period]) datasets[type][row.period] = 0;
                 
                 if (type === 'water') {
-                    // Only include if calculation_details exist (meaning it was actually calculated)
-                    if (row.warm_calculation_details) {
-                        datasets[type][row.period] += row.warm_consumption || 0;
-                        allPeriods.add(row.period);
-                    }
-                    if (row.cold_calculation_details) {
-                        datasets[type][row.period] += row.cold_consumption || 0;
+                    if (row.total_water_consumption !== undefined) {
+                        datasets[type][row.period] += row.total_water_consumption || 0;
                         allPeriods.add(row.period);
                     }
                 } else {

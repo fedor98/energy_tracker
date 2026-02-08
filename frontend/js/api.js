@@ -1,5 +1,12 @@
 const API_BASE = '/api';
 
+export function generateMeterUUID() {
+    return 'xxxxxxxx'.replace(/[x]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        return r.toString(16).toUpperCase();
+    });
+}
+
 export async function getConfig() {
     const res = await fetch(`${API_BASE}/config`);
     if (!res.ok) throw new Error('Failed to fetch config');
@@ -62,6 +69,7 @@ export async function getElectricityReadings(params = {}) {
     if (params.start) query.append('start', params.start);
     if (params.end) query.append('end', params.end);
     if (params.meter) query.append('meter', params.meter);
+    if (params.meter_id) query.append('meter_id', params.meter_id);
 
     const res = await fetch(`${API_BASE}/readings/electricity?${query.toString()}`);
     if (!res.ok) throw new Error('Failed to fetch electricity readings');
@@ -108,6 +116,7 @@ export async function getWaterReadings(params = {}) {
     if (params.start) query.append('start', params.start);
     if (params.end) query.append('end', params.end);
     if (params.room) query.append('room', params.room);
+    if (params.meter_id) query.append('meter_id', params.meter_id);
 
     const res = await fetch(`${API_BASE}/readings/water?${query.toString()}`);
     if (!res.ok) throw new Error('Failed to fetch water readings');
@@ -154,6 +163,7 @@ export async function getGasReadings(params = {}) {
     if (params.start) query.append('start', params.start);
     if (params.end) query.append('end', params.end);
     if (params.room) query.append('room', params.room);
+    if (params.meter_id) query.append('meter_id', params.meter_id);
 
     const res = await fetch(`${API_BASE}/readings/gas?${query.toString()}`);
     if (!res.ok) throw new Error('Failed to fetch gas readings');

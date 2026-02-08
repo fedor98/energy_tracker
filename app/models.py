@@ -1,28 +1,43 @@
-from typing import List, Optional, Literal
-from pydantic import BaseModel
+from typing import List, Optional, Literal, Any
+from pydantic import BaseModel, model_validator
+import uuid
 
-# Configuration Models
+def generate_meter_uuid():
+    """Generate a 6-character UUID-like identifier for meters."""
+    return str(uuid.uuid4())[:8].upper()
+
+class MeterConfig(BaseModel):
+    name: str
+    meter_id: Optional[str] = None
+
+class GasMeterConfig(BaseModel):
+    room: str
+    meter_id: str
+
 class GasConfig(BaseModel):
-    rooms: List[str]
+    meters: List[GasMeterConfig]
+
+class WaterMeterConfig(BaseModel):
+    room: str
+    is_warm_water: bool = False
+    meter_id: str
 
 class WaterConfig(BaseModel):
-    room: str
-    is_warm_water: bool = False  # False = cold water, True = warm water
+    meters: List[WaterMeterConfig]
     
 class ElectricityConfig(BaseModel):
-    meters: List[str]
+    meters: List[MeterConfig]
 
 class AppConfig(BaseModel):
     gas: GasConfig
-    water: List[WaterConfig]
+    water: WaterConfig
     electricity: ElectricityConfig
-    
-    # Default factory to prevent errors if empty
+
     @classmethod
     def empty(cls):
         return cls(
-            gas=GasConfig(rooms=[]),
-            water=[],
+            gas=GasConfig(meters=[]),
+            water=WaterConfig(meters=[]),
             electricity=ElectricityConfig(meters=[])
         )
 
@@ -33,6 +48,7 @@ class ReadingInput(BaseModel):
     type: Literal["electricity", "water", "gas"]
     meter: str  # Room name or Meter name
     channel: Optional[str] = None  # "warm", "cold", or None
+    meter_id: Optional[str] = None  # Zählernummer
     value: float
 
 class ReadingItem(ReadingInput):
@@ -42,6 +58,7 @@ class ReadingItem(ReadingInput):
 class ElectricityReadingInput(BaseModel):
     date: str  # YYYY-MM-DD
     meter_name: str
+    meter_id: str
     value: float
     comment: Optional[str] = None
 
@@ -54,6 +71,7 @@ class ElectricityReading(ElectricityReadingInput):
 class WaterReadingInput(BaseModel):
     date: str  # YYYY-MM-DD
     room: str
+    meter_id: str
     value: float
     is_warm_water: bool = False  # False = cold water, True = warm water
     comment: Optional[str] = None
@@ -61,12 +79,15 @@ class WaterReadingInput(BaseModel):
 class WaterReading(WaterReadingInput):
     id: int
     period: str  # YYYY-MM, derived from date
-    consumption: Optional[float] = None
     calculation_details: Optional[str] = None
+    total_water_consumption: Optional[float] = None
+    warm_water_consumption: Optional[float] = None
+    cold_water_consumption: Optional[float] = None
 
 class GasReadingInput(BaseModel):
     date: str  # YYYY-MM-DD
     room: str
+    meter_id: str
     value: float
     comment: Optional[str] = None
 
