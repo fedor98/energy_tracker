@@ -30,19 +30,26 @@
 ## In Bearbeitung 🔄
 
 ### Phase 2: Dashboard Tab-Inhalte
-- [ ] **Tab: Consumption** 
-  - [ ] Chart.js Line-Chart
-  - [ ] 3 Datasets (Electricity, Water, Gas)
-  - [ ] Responsive Chart-Container
-- [ ] **Tab: Electricity**
-  - [ ] Data Table
-  - [ ] Columns: Period, Date, Meter, Value, Consumption
-- [ ] **Tab: Water**
-  - [ ] Data Table
-  - [ ] Warm/Cold Indikator (🔴/🔵)
-- [ ] **Tab: Gas**
-  - [ ] Data Table
-  - [ ] Columns: Period, Date, Room, Value, Consumption
+- [x] **Tab: Consumption** 
+  - [x] Chart.js Line-Chart
+  - [x] 3 Datasets (Electricity, Water, Gas)
+  - [x] Responsive Chart-Container (300px mobile, 400px desktop)
+  - [x] Cumulated/Split water toggle support
+- [x] **Tab: Calc**
+  - [x] Three calculation tables (Electricity, Water, Gas)
+  - [x] Dynamic columns based on meter count
+  - [x] Period, Consumption, Segments, Total columns
+  - [x] Water meter emoji indicators (🔴/🔵)
+- [x] **Tab: Electricity**
+  - [x] Data Table with monthly grouping
+  - [x] Columns: Date, Meter, Value
+  - [x] Visual separators between months
+- [x] **Tab: Water**
+  - [x] Data Table with monthly grouping
+  - [x] Warm/Cold indicators (🔴/🔵)
+- [x] **Tab: Gas**
+  - [x] Data Table with monthly grouping
+  - [x] Columns: Date, Room, Value
 
 ## Offen 📋
 

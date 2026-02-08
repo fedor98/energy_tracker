@@ -169,6 +169,72 @@
 
 ---
 
+## 2026-02-08 (Phase 2 - Dashboard Tab Contents)
+
+### Dashboard Tab Contents Implementation
+**Status:** ✅ Abgeschlossen
+
+**Aktivitäten:**
+- Calculation APIs hinzugefügt (`frontend/app/lib/api.ts`):
+  - Neue Types: `CalculationMeter`, `CalculationPeriod`, `CalculationData`
+  - Neue Funktionen: `getElectricityCalculations()`, `getWaterCalculations()`, `getGasCalculations()`
+  
+- ConsumptionChart Komponente erstellt (`frontend/app/components/ConsumptionChart.tsx`):
+  - Line-Chart mit Chart.js
+  - 3-4 Datasets (Electricity gelb, Gas grün, Water blau/rot)
+  - Cumulated/Split Water Toggle Support
+  - Responsive: 300px Mobile, 400px Desktop
+  - Tooltips mit modernem Styling
+  
+- CalculationTables Komponente erstellt (`frontend/app/components/CalculationTables.tsx`):
+  - Drei Tabellen für Electricity, Water, Gas
+  - Dynamische Spalten basierend auf verfügbaren Metern
+  - Sub-header für Consumption/Segments
+  - Water: Emoji-Indikatoren (🔴/🔵) statt Text
+  - Horizontal scroll auf Mobile
+  
+- MeterDataTable Komponente erstellt (`frontend/app/components/MeterDataTable.tsx`):
+  - Einheitliche Tabelle für Electricity/Water/Gas Tabs
+  - Monatliche Gruppierung mit visuellen Trennlinien
+  - Alphabetsiche Sortierung innerhalb jedes Monats
+  - Type-Guards für sicheren Datenzugriff
+  - Water: 🔴/🔵 Indikatoren für Warm/Kalt
+  
+- Dashboard Route aktualisiert (`frontend/app/routes/dashboard.tsx`):
+  - Lazy Loading für Calculation-Daten (nur bei Tab-Wechsel)
+  - Conditional Rendering aller 5 Tabs
+  - Separate Loading-States für Readings vs Calculations
+  - Vollständige Integration aller neuen Komponenten
+  
+- CSS Patterns ergänzt (`frontend/app/app.css`):
+  - `.data-table` - Basistabellen-Styles
+  - `.month-divider` - Visuelle Monatstrenner
+  - `.seg-col` - Segments-Spalten im Calc-Tab
+  - `.calc-section` - Abschnitts-Trennung
+  - Mobile Optimierungen
+
+**Entscheidungen:**
+- Chart.js direkt importiert (kein Lazy Loading nötig)
+- Nur Tabellen, keine Mobile Cards (wie gewünscht)
+- Calculation-Daten werden erst beim Tab-Wechsel geladen (Performance)
+- Type-Guards für sicheren Property-Zugriff (meter_name vs room)
+
+**Geänderte Dateien:**
+- `frontend/app/lib/api.ts` (+ Calculation Types & APIs)
+- `frontend/app/components/ConsumptionChart.tsx` (neu)
+- `frontend/app/components/CalculationTables.tsx` (neu)
+- `frontend/app/components/MeterDataTable.tsx` (neu)
+- `frontend/app/routes/dashboard.tsx` (komplett überarbeitet)
+- `frontend/app/app.css` (+ Table & Calc Styles)
+- `frontend_old_mounted_to_python/TODO.md` (Tasks abgehakt)
+- `frontend_old_mounted_to_python/WORKLOG.md` (Dokumentation)
+
+**Nächste Schritte:**
+- Phase 2 fortsetzen: Setup-Wizard Route
+- Optional: Reset App Data Button zu Settings verschieben
+
+---
+
 ## Format für neue Einträge
 
 ```markdown

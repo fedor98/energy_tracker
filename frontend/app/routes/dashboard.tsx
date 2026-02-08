@@ -1,23 +1,37 @@
 /**
  * Dashboard Route - Main entry point of the Energy Tracker application
  * 
- * This component serves as the primary dashboard displaying energy consumption data
- * across different utility types (Electricity, Water, Gas). It features:
+ * Displays energy consumption data across different utility types with:
  * - Date range filtering (start/end month)
- * - Tab-based navigation between consumption chart and detailed tables
- * - Responsive layout optimized for both mobile and desktop
- * - Skeleton loading states while fetching data
- * - Cumulated water toggle for consumption view
+ * - 5 tabs: Consumption (chart), Calc (calculation tables), Electricity, Water, Gas (data tables)
+ * - Responsive layout optimized for mobile and desktop
+ * - Skeleton loading states and error handling
  * 
- * The dashboard fetches data from the backend API and manages the active tab state
- * and filter parameters using React hooks.
+ * Data fetching is triggered when filter dates change. Each tab displays
+ * its data independently, with the Calc tab requiring separate API calls
+ * for calculation details.
  */
 
 import { useState, useEffect, useRef } from 'react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { getElectricityReadings, getWaterReadings, getGasReadings } from '../lib/api';
-import type { ElectricityReading, WaterReading, GasReading } from '../lib/api';
+import {
+  getElectricityReadings,
+  getWaterReadings,
+  getGasReadings,
+  getElectricityCalculations,
+  getWaterCalculations,
+  getGasCalculations,
+} from '../lib/api';
+import type {
+  ElectricityReading,
+  WaterReading,
+  GasReading,
+  CalculationData,
+} from '../lib/api';
+import { ConsumptionChart } from '../components/ConsumptionChart';
+import { CalculationTables } from '../components/CalculationTables';
+import { MeterDataTable } from '../components/MeterDataTable';
 
 // Tab configuration for the dashboard - matches original layout
 const DASHBOARD_TABS = [
@@ -58,11 +72,9 @@ function ContentSkeleton() {
 
 /**
  * DashboardTabs Component
- * Custom tabs implementation to match the original layout:
- * - Desktop: Consumption + Calc on left, Electricity/Water/Gas pushed to right
- * - Mobile: Row 1 (Consumption + Calc), Row 2 (Electricity + Water + Gas)
- * - Active tab connects visually with content area below
- * - Consistent height and styling across all tabs
+ * Custom tabs implementation with specific layout requirements:
+ * - Desktop: Consumption + Calc on left, others pushed to right
+ * - Mobile: Two rows (Consumption/Calc | Electricity/Water/Gas)
  */
 interface DashboardTabsProps {
   activeTab: string;
@@ -70,17 +82,18 @@ interface DashboardTabsProps {
 }
 
 function DashboardTabs({ activeTab, onChange }: DashboardTabsProps) {
-  const leftTabs = DASHBOARD_TABS.filter(t => t.position === 'left');
-  const rightTabs = DASHBOARD_TABS.filter(t => t.position === 'right');
-  
-  // Common button classes for consistent sizing and rounded corners
-  const buttonBaseClasses = "px-4 py-2 font-medium transition-colors rounded-lg text-sm sm:text-base";
-  
+  const leftTabs = DASHBOARD_TABS.filter((t) => t.position === 'left');
+  const rightTabs = DASHBOARD_TABS.filter((t) => t.position === 'right');
+
+  // Common button classes for consistent sizing
+  const buttonBaseClasses =
+    'px-4 py-2 font-medium transition-colors rounded-lg text-sm sm:text-base';
+
   return (
     <div className="flex flex-col gap-2 pb-4">
       {/* Mobile: Two rows layout */}
       <div className="flex sm:hidden flex-col gap-2">
-        {/* Row 1: Consumption & Calc - full width, equal size */}
+        {/* Row 1: Consumption & Calc */}
         <div className="flex gap-2">
           {leftTabs.map((tab) => (
             <button
@@ -96,8 +109,8 @@ function DashboardTabs({ activeTab, onChange }: DashboardTabsProps) {
             </button>
           ))}
         </div>
-        
-        {/* Row 2: Electricity, Water, Gas - equal width, icon only on mobile */}
+
+        {/* Row 2: Electricity, Water, Gas */}
         <div className="flex gap-2">
           {rightTabs.map((tab) => (
             <button
@@ -114,10 +127,10 @@ function DashboardTabs({ activeTab, onChange }: DashboardTabsProps) {
           ))}
         </div>
       </div>
-      
+
       {/* Desktop: Single row with left/right alignment */}
       <div className="hidden sm:flex flex-row gap-2">
-        {/* Left group: Consumption & Calc */}
+        {/* Left group */}
         <div className="flex gap-2">
           {leftTabs.map((tab) => (
             <button
@@ -133,11 +146,11 @@ function DashboardTabs({ activeTab, onChange }: DashboardTabsProps) {
             </button>
           ))}
         </div>
-        
+
         {/* Spacer pushes right group to end */}
         <div className="flex-1"></div>
-        
-        {/* Right group: Electricity, Water, Gas */}
+
+        {/* Right group */}
         <div className="flex gap-2">
           {rightTabs.map((tab) => (
             <button
@@ -159,103 +172,173 @@ function DashboardTabs({ activeTab, onChange }: DashboardTabsProps) {
 }
 
 export default function Dashboard() {
-  // Filter state - manages the date range selection
+  // Filter state for date range selection
   const [startMonth, setStartMonth] = useState<string>('');
   const [endMonth, setEndMonth] = useState<string>('');
-  
-  // Refs for programmatically opening date pickers
+
+  // Refs for date picker interactions
   const startMonthRef = useRef<HTMLInputElement>(null);
   const endMonthRef = useRef<HTMLInputElement>(null);
-  
-  // Navigation state - tracks which tab is currently active
+
+  // Navigation state for active tab
   const [activeTab, setActiveTab] = useState<string>('consumption');
-  
-  // Cumulated water toggle state - only affects consumption view
+
+  // Cumulated water toggle - only affects consumption chart
   const [cumulatedWater, setCumulatedWater] = useState<boolean>(true);
-  
-  // Data state - stores fetched readings and loading/error states
+
+  // Data states for meter readings
   const [electricityData, setElectricityData] = useState<ElectricityReading[]>([]);
   const [waterData, setWaterData] = useState<WaterReading[]>([]);
   const [gasData, setGasData] = useState<GasReading[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
+
+  // Data states for calculations (loaded separately for Calc tab)
+  const [elecCalcData, setElecCalcData] = useState<CalculationData>({ periods: [] });
+  const [waterCalcData, setWaterCalcData] = useState<CalculationData>({ periods: [] });
+  const [gasCalcData, setGasCalcData] = useState<CalculationData>({ periods: [] });
+
+  // Loading and error states
+  const [loadingReadings, setLoadingReadings] = useState<boolean>(false);
+  const [loadingCalculations, setLoadingCalculations] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * Initialize default date range on component mount
-   * Sets the filter to the last 12 months by default
+   * Initialize default date range on mount (last 12 months)
    */
   useEffect(() => {
     const now = new Date();
     const endStr = now.toISOString().slice(0, 7); // YYYY-MM format
     const start = new Date(now.setFullYear(now.getFullYear() - 1));
     const startStr = start.toISOString().slice(0, 7);
-    
+
     setStartMonth(startStr);
     setEndMonth(endStr);
   }, []);
 
   /**
-   * Fetch data whenever the date filters change
-   * Uses Promise.all to fetch all three reading types in parallel
+   * Fetch meter readings when date filters change
    */
   useEffect(() => {
     if (!startMonth || !endMonth) return;
-    
-    async function fetchData() {
-      setLoading(true);
+
+    async function fetchReadings() {
+      setLoadingReadings(true);
       setError(null);
-      
+
       try {
-        // Fetch all reading types concurrently for better performance
         const [elecData, waterDataResult, gasDataResult] = await Promise.all([
           getElectricityReadings({ start: startMonth, end: endMonth }),
           getWaterReadings({ start: startMonth, end: endMonth }),
           getGasReadings({ start: startMonth, end: endMonth }),
         ]);
-        
+
         setElectricityData(elecData);
         setWaterData(waterDataResult);
         setGasData(gasDataResult);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch data');
       } finally {
-        setLoading(false);
+        setLoadingReadings(false);
       }
     }
-    
-    fetchData();
+
+    fetchReadings();
   }, [startMonth, endMonth]);
 
   /**
-   * Reset filters to the last 12 months
-   * Called when user clicks "Last 12 Months" button
+   * Fetch calculation data only when Calc tab becomes active
+   * This avoids unnecessary API calls for unused tabs
+   */
+  useEffect(() => {
+    if (activeTab !== 'calc') return;
+
+    async function fetchCalculations() {
+      setLoadingCalculations(true);
+      setError(null);
+
+      try {
+        const [elecCalc, waterCalc, gasCalc] = await Promise.all([
+          getElectricityCalculations(),
+          getWaterCalculations(),
+          getGasCalculations(),
+        ]);
+
+        setElecCalcData(elecCalc);
+        setWaterCalcData(waterCalc);
+        setGasCalcData(gasCalc);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch calculations');
+      } finally {
+        setLoadingCalculations(false);
+      }
+    }
+
+    fetchCalculations();
+  }, [activeTab]);
+
+  /**
+   * Reset filters to default (last 12 months)
    */
   const handleResetFilters = () => {
     const now = new Date();
     const endStr = now.toISOString().slice(0, 7);
     const start = new Date(now.setFullYear(now.getFullYear() - 1));
     const startStr = start.toISOString().slice(0, 7);
-    
+
     setStartMonth(startStr);
     setEndMonth(endStr);
   };
 
   /**
-   * Format month value for display in input
-   * Ensures the value is in YYYY-MM format for proper display
+   * Render the appropriate content based on active tab
    */
-  const formatMonthValue = (value: string): string => {
-    if (!value) return '';
-    // Ensure value is in YYYY-MM format
-    if (value.length === 7 && value.includes('-')) {
-      return value;
+  const renderTabContent = () => {
+    // Show skeleton while loading
+    if (activeTab === 'calc' && loadingCalculations) {
+      return <ContentSkeleton />;
     }
-    return value;
+
+    if (activeTab !== 'calc' && loadingReadings) {
+      return <ContentSkeleton />;
+    }
+
+    // Render content based on active tab
+    switch (activeTab) {
+      case 'consumption':
+        return (
+          <ConsumptionChart
+            electricityData={electricityData}
+            waterData={waterData}
+            gasData={gasData}
+            cumulatedWater={cumulatedWater}
+          />
+        );
+
+      case 'calc':
+        return (
+          <CalculationTables
+            electricityData={elecCalcData}
+            waterData={waterCalcData}
+            gasData={gasCalcData}
+          />
+        );
+
+      case 'electricity':
+        return <MeterDataTable data={electricityData} type="electricity" />;
+
+      case 'water':
+        return <MeterDataTable data={waterData} type="water" />;
+
+      case 'gas':
+        return <MeterDataTable data={gasData} type="gas" />;
+
+      default:
+        return null;
+    }
   };
 
   return (
     <div className="dashboard-container min-h-screen bg-gray-50">
-      {/* Page Header - Matches original styling with Indigo color */}
+      {/* Page Header */}
       <header className="bg-white px-4 sm:px-6 lg:px-8 py-4 shadow-sm mb-6">
         <h1 className="text-xl font-bold text-indigo-600 tracking-tight">
           Energy Tracker
@@ -263,12 +346,15 @@ export default function Dashboard() {
       </header>
 
       <main className="px-4 sm:px-6 lg:px-8 pb-8">
-        {/* Filter Section - Responsive layout: stacked on mobile, inline on desktop */}
+        {/* Filter Section */}
         <Card className="mb-6">
           <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-end">
-            {/* Start Month Input - min-w-0 prevents overflow on iOS Safari */}
+            {/* Start Month Input */}
             <div className="w-full sm:flex-1 min-w-0">
-              <label htmlFor="start-month" className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="start-month"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Start Month
               </label>
               <div className="relative">
@@ -276,23 +362,25 @@ export default function Dashboard() {
                   type="month"
                   id="start-month"
                   ref={startMonthRef}
-                  value={formatMonthValue(startMonth)}
+                  value={startMonth}
                   onChange={(e) => setStartMonth(e.target.value)}
                   className="w-full max-w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none cursor-pointer"
                   style={{ WebkitAppearance: 'none' }}
                 />
-                {/* Invisible overlay to capture clicks on the entire input area */}
-                <div 
+                <div
                   className="absolute inset-0 cursor-pointer sm:block hidden"
                   onClick={() => startMonthRef.current?.showPicker?.()}
                   style={{ zIndex: 10 }}
                 />
               </div>
             </div>
-            
-            {/* End Month Input - min-w-0 prevents overflow on iOS Safari */}
+
+            {/* End Month Input */}
             <div className="w-full sm:flex-1 min-w-0">
-              <label htmlFor="end-month" className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="end-month"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 End Month
               </label>
               <div className="relative">
@@ -300,30 +388,29 @@ export default function Dashboard() {
                   type="month"
                   id="end-month"
                   ref={endMonthRef}
-                  value={formatMonthValue(endMonth)}
+                  value={endMonth}
                   onChange={(e) => setEndMonth(e.target.value)}
                   className="w-full max-w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none cursor-pointer"
                   style={{ WebkitAppearance: 'none' }}
                 />
-                {/* Invisible overlay to capture clicks on the entire input area */}
-                <div 
+                <div
                   className="absolute inset-0 cursor-pointer sm:block hidden"
                   onClick={() => endMonthRef.current?.showPicker?.()}
                   style={{ zIndex: 10 }}
                 />
               </div>
             </div>
-            
+
             {/* Action buttons */}
             <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
-              <Button 
-                onClick={() => {}} 
+              <Button
+                onClick={() => {}}
                 variant="primary"
                 className="flex-1 sm:flex-none whitespace-nowrap"
               >
                 Apply
               </Button>
-              <Button 
+              <Button
                 onClick={handleResetFilters}
                 variant="secondary"
                 className="flex-1 sm:flex-none whitespace-nowrap"
@@ -343,13 +430,10 @@ export default function Dashboard() {
 
         {/* Main Content Area */}
         <Card>
-          {/* Tab Navigation with custom layout */}
-          <DashboardTabs 
-            activeTab={activeTab}
-            onChange={setActiveTab}
-          />
-          
-          {/* Cumulated Water Checkbox - Only show in Consumption tab */}
+          {/* Tab Navigation */}
+          <DashboardTabs activeTab={activeTab} onChange={setActiveTab} />
+
+          {/* Cumulated Water Checkbox - Only in Consumption tab */}
           {activeTab === 'consumption' && (
             <div className="mb-4 inline-flex items-center gap-2">
               <input
@@ -359,33 +443,18 @@ export default function Dashboard() {
                 onChange={(e) => setCumulatedWater(e.target.checked)}
                 className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
               />
-              <label 
-                htmlFor="cumulated-water" 
+              <label
+                htmlFor="cumulated-water"
                 className="text-sm text-gray-700 cursor-pointer select-none whitespace-nowrap"
               >
                 Cumulated Water
               </label>
             </div>
           )}
-          
-          {/* Tab Content Container - border-top connects with tabs */}
+
+          {/* Tab Content */}
           <div className="dashboard-content border-t border-gray-300 pt-6 overflow-x-auto">
-            {loading ? (
-              <ContentSkeleton />
-            ) : (
-              <div className="text-center py-12 text-gray-500">
-                <p className="text-lg mb-2">Tab content coming in the next step</p>
-                <p className="text-sm">Active tab: {activeTab}</p>
-                <p className="text-xs mt-4 text-gray-400">
-                  Data loaded: {electricityData.length} electricity, {waterData.length} water, {gasData.length} gas readings
-                </p>
-                {activeTab === 'consumption' && (
-                  <p className="text-xs mt-2 text-gray-400">
-                    Cumulated water: {cumulatedWater ? 'On' : 'Off'}
-                  </p>
-                )}
-              </div>
-            )}
+            {renderTabContent()}
           </div>
         </Card>
       </main>
