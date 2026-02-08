@@ -31,32 +31,35 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             date TEXT NOT NULL,
             meter_name TEXT NOT NULL,
+            meter_id TEXT NOT NULL,
             value REAL NOT NULL,
             comment TEXT,
-            UNIQUE(date, meter_name)
+            UNIQUE(date, meter_name, meter_id)
         )
     ''')
-    
+
     c.execute('''
         CREATE TABLE IF NOT EXISTS readings_water (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             date TEXT NOT NULL,
             room TEXT NOT NULL,
+            meter_id TEXT NOT NULL,
             value REAL NOT NULL,
             is_warm_water BOOLEAN NOT NULL DEFAULT 0,
             comment TEXT,
-            UNIQUE(date, room, is_warm_water)
+            UNIQUE(date, room, is_warm_water, meter_id)
         )
     ''')
-    
+
     c.execute('''
         CREATE TABLE IF NOT EXISTS readings_gas (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             date TEXT NOT NULL,
             room TEXT NOT NULL,
+            meter_id TEXT NOT NULL,
             value REAL NOT NULL,
             comment TEXT,
-            UNIQUE(date, room)
+            UNIQUE(date, room, meter_id)
         )
     ''')
     
@@ -67,10 +70,11 @@ def init_db():
             period TEXT NOT NULL,
             entity_type TEXT NOT NULL,
             entity_id TEXT NOT NULL,
+            meter_id TEXT,
             consumption_value REAL,
             calculation_details TEXT,
             calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            UNIQUE(period, entity_type, entity_id)
+            UNIQUE(period, entity_type, entity_id, meter_id)
         )
     ''')
     
@@ -85,6 +89,9 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_electricity_meter ON readings_electricity(meter_name)
     ''')
     c.execute('''
+        CREATE INDEX IF NOT EXISTS idx_electricity_meter_id ON readings_electricity(meter_id)
+    ''')
+    c.execute('''
         CREATE INDEX IF NOT EXISTS idx_water_date ON readings_water(date)
     ''')
     c.execute('''
@@ -92,6 +99,9 @@ def init_db():
     ''')
     c.execute('''
         CREATE INDEX IF NOT EXISTS idx_water_room ON readings_water(room)
+    ''')
+    c.execute('''
+        CREATE INDEX IF NOT EXISTS idx_water_meter_id ON readings_water(meter_id)
     ''')
     c.execute('''
         CREATE INDEX IF NOT EXISTS idx_gas_date ON readings_gas(date)
@@ -103,91 +113,18 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_gas_room ON readings_gas(room)
     ''')
     c.execute('''
+        CREATE INDEX IF NOT EXISTS idx_gas_meter_id ON readings_gas(meter_id)
+    ''')
+    c.execute('''
         CREATE INDEX IF NOT EXISTS idx_consumption_period ON consumption_calc(period)
     ''')
-    
-    conn.commit()
-    
-    # Run migration if old table structure exists
-    _migrate_water_readings_if_needed(conn)
-    
-    conn.close()
-
-
-def _migrate_water_readings_if_needed(conn):
-    """Migrate old water readings (with warm_value/cold_value/total_value) to new structure."""
-    c = conn.cursor()
-    
-    # Check if old table structure exists (has warm_value column)
-    c.execute("PRAGMA table_info(readings_water)")
-    columns = {col['name'] for col in c.fetchall()}
-    
-    if 'warm_value' not in columns:
-        # Already migrated or new database
-        return
-    
-    # Backup old data
-    c.execute('SELECT * FROM readings_water')
-    old_readings = c.fetchall()
-    
-    if not old_readings:
-        # No data to migrate, just recreate table
-        c.execute('DROP TABLE readings_water')
-        c.execute('''
-            CREATE TABLE readings_water (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                date TEXT NOT NULL,
-                room TEXT NOT NULL,
-                value REAL NOT NULL,
-                is_warm_water BOOLEAN NOT NULL DEFAULT 0,
-                comment TEXT,
-                UNIQUE(date, room, is_warm_water)
-            )
-        ''')
-        conn.commit()
-        return
-    
-    # Create new table with migration suffix
     c.execute('''
-        CREATE TABLE readings_water_new (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            date TEXT NOT NULL,
-            room TEXT NOT NULL,
-            value REAL NOT NULL,
-            is_warm_water BOOLEAN NOT NULL DEFAULT 0,
-            comment TEXT,
-            UNIQUE(date, room, is_warm_water)
-        )
+        CREATE INDEX IF NOT EXISTS idx_consumption_meter_id ON consumption_calc(meter_id)
     ''')
     
-    # Migrate data: create separate rows for warm and cold water
-    for reading in old_readings:
-        comment = reading['comment'] or ''
-        
-        # Migrate warm water reading if exists
-        if reading['warm_value'] is not None:
-            c.execute('''
-                INSERT INTO readings_water_new (date, room, value, is_warm_water, comment)
-                VALUES (?, ?, ?, 1, ?)
-            ''', (reading['date'], reading['room'], reading['warm_value'], comment))
-        
-        # Migrate cold water reading if exists
-        if reading['cold_value'] is not None:
-            c.execute('''
-                INSERT INTO readings_water_new (date, room, value, is_warm_water, comment)
-                VALUES (?, ?, ?, 0, ?)
-            ''', (reading['date'], reading['room'], reading['cold_value'], comment))
-    
-    # Replace old table with new one
-    c.execute('DROP TABLE readings_water')
-    c.execute('ALTER TABLE readings_water_new RENAME TO readings_water')
-    
-    # Recreate indexes
-    c.execute('CREATE INDEX IF NOT EXISTS idx_water_date ON readings_water(date)')
-    c.execute('CREATE INDEX IF NOT EXISTS idx_water_period ON readings_water(SUBSTR(date, 1, 7))')
-    c.execute('CREATE INDEX IF NOT EXISTS idx_water_room ON readings_water(room)')
-    
     conn.commit()
+    conn.close()
+
 
 def _calculate_consumption_from_readings(readings: List[Dict[str, Any]]) -> tuple:
     """
@@ -247,11 +184,20 @@ def _calculate_electricity_consumption(conn, meter_name: str, date: str):
     c = conn.cursor()
     period = date[:7]  # YYYY-MM from YYYY-MM-DD
     
+    # Get meter_id for this meter
+    c.execute('''
+        SELECT meter_id FROM readings_electricity
+        WHERE meter_name = ?
+        LIMIT 1
+    ''', (meter_name,))
+    meter_row = c.fetchone()
+    meter_id = meter_row['meter_id'] if meter_row else None
+    
     # Delete old calculation
     c.execute('''
         DELETE FROM consumption_calc 
-        WHERE period = ? AND entity_type = 'electricity' AND entity_id = ?
-    ''', (period, meter_name))
+        WHERE period = ? AND entity_type = 'electricity' AND entity_id = ? AND meter_id = ?
+    ''', (period, meter_name, meter_id))
     
     # Get all readings for the period
     c.execute('''
@@ -284,9 +230,9 @@ def _calculate_electricity_consumption(conn, meter_name: str, date: str):
     # Insert calculation result
     calc_details_json = json.dumps(calc_details) if calc_details else None
     c.execute('''
-        INSERT INTO consumption_calc (period, entity_type, entity_id, consumption_value, calculation_details)
-        VALUES (?, 'electricity', ?, ?, ?)
-    ''', (period, meter_name, consumption, calc_details_json))
+        INSERT INTO consumption_calc (period, entity_type, entity_id, meter_id, consumption_value, calculation_details)
+        VALUES (?, 'electricity', ?, ?, ?, ?)
+    ''', (period, meter_name, meter_id, consumption, calc_details_json))
     
     conn.commit()
 
@@ -311,11 +257,20 @@ def _calculate_water_consumption(conn, room: str, date: str, is_warm_water = Non
         water_types.append(('water_cold', 0))
     
     for entity_type, is_warm in water_types:
+        # Get meter_id for this room and type
+        c.execute('''
+            SELECT meter_id FROM readings_water
+            WHERE room = ? AND is_warm_water = ?
+            LIMIT 1
+        ''', (room, is_warm))
+        meter_row = c.fetchone()
+        meter_id = meter_row['meter_id'] if meter_row else None
+        
         # Delete old calculation for this type
         c.execute('''
             DELETE FROM consumption_calc 
-            WHERE period = ? AND entity_id = ? AND entity_type = ?
-        ''', (period, room, entity_type))
+            WHERE period = ? AND entity_id = ? AND entity_type = ? AND meter_id = ?
+        ''', (period, room, entity_type, meter_id))
         
         # Get all readings for the period and type
         c.execute('''
@@ -351,9 +306,9 @@ def _calculate_water_consumption(conn, room: str, date: str, is_warm_water = Non
         # Insert calculation result
         calc_details_json = json.dumps(calc_details) if calc_details else None
         c.execute('''
-            INSERT INTO consumption_calc (period, entity_type, entity_id, consumption_value, calculation_details)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (period, entity_type, room, consumption, calc_details_json))
+            INSERT INTO consumption_calc (period, entity_type, entity_id, meter_id, consumption_value, calculation_details)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (period, entity_type, room, meter_id, consumption, calc_details_json))
     
     # Calculate total consumption (sum of warm + cold) if both exist
     if is_warm_water is None:
@@ -425,11 +380,20 @@ def _calculate_gas_consumption(conn, room: str, date: str):
     c = conn.cursor()
     period = date[:7]  # YYYY-MM from YYYY-MM-DD
     
+    # Get meter_id for this room
+    c.execute('''
+        SELECT meter_id FROM readings_gas
+        WHERE room = ?
+        LIMIT 1
+    ''', (room,))
+    meter_row = c.fetchone()
+    meter_id = meter_row['meter_id'] if meter_row else None
+    
     # Delete old calculation
     c.execute('''
         DELETE FROM consumption_calc 
-        WHERE period = ? AND entity_type = 'gas' AND entity_id = ?
-    ''', (period, room))
+        WHERE period = ? AND entity_type = 'gas' AND entity_id = ? AND meter_id = ?
+    ''', (period, room, meter_id))
     
     # Get all readings for the period
     c.execute('''
@@ -462,9 +426,9 @@ def _calculate_gas_consumption(conn, room: str, date: str):
     # Insert calculation result
     calc_details_json = json.dumps(calc_details) if calc_details else None
     c.execute('''
-        INSERT INTO consumption_calc (period, entity_type, entity_id, consumption_value, calculation_details)
-        VALUES (?, 'gas', ?, ?, ?)
-    ''', (period, room, consumption, calc_details_json))
+        INSERT INTO consumption_calc (period, entity_type, entity_id, meter_id, consumption_value, calculation_details)
+        VALUES (?, 'gas', ?, ?, ?, ?)
+    ''', (period, room, meter_id, consumption, calc_details_json))
     
     conn.commit()
 
@@ -492,15 +456,15 @@ def save_electricity_reading(reading: ElectricityReadingInput) -> int:
     """Save or update an electricity reading. Returns the reading ID."""
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     c.execute('''
-        INSERT INTO readings_electricity (date, meter_name, value, comment)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(date, meter_name) DO UPDATE SET
+        INSERT INTO readings_electricity (date, meter_name, meter_id, value, comment)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(date, meter_name, meter_id) DO UPDATE SET
             value = excluded.value,
             comment = excluded.comment
         RETURNING id
-    ''', (reading.date, reading.meter_name, reading.value, reading.comment))
+    ''', (reading.date, reading.meter_name, reading.meter_id, reading.value, reading.comment))
     
     result = c.fetchone()
     conn.commit()
@@ -535,16 +499,17 @@ def get_electricity_reading(id: int) -> Optional[Dict[str, Any]]:
     """Get a single electricity reading by ID."""
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     c.execute('''
-        SELECT e.*, 
+        SELECT e.*,
             SUBSTR(e.date, 1, 7) as period,
             c.consumption_value as consumption,
             c.calculation_details
         FROM readings_electricity e
-        LEFT JOIN consumption_calc c ON SUBSTR(e.date, 1, 7) = c.period 
-            AND c.entity_type = 'electricity' 
+        LEFT JOIN consumption_calc c ON SUBSTR(e.date, 1, 7) = c.period
+            AND c.entity_type = 'electricity'
             AND c.entity_id = e.meter_name
+            AND c.meter_id = e.meter_id
         WHERE e.id = ?
     ''', (id,))
     
@@ -556,25 +521,27 @@ def get_electricity_reading(id: int) -> Optional[Dict[str, Any]]:
 def get_electricity_readings(
     start_period: Optional[str] = None,
     end_period: Optional[str] = None,
-    meter_name: Optional[str] = None
+    meter_name: Optional[str] = None,
+    meter_id: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """Get electricity readings with optional filters."""
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     query = '''
-        SELECT e.*, 
+        SELECT e.*,
             SUBSTR(e.date, 1, 7) as period,
             c.consumption_value as consumption,
             c.calculation_details
         FROM readings_electricity e
-        LEFT JOIN consumption_calc c ON SUBSTR(e.date, 1, 7) = c.period 
-            AND c.entity_type = 'electricity' 
+        LEFT JOIN consumption_calc c ON SUBSTR(e.date, 1, 7) = c.period
+            AND c.entity_type = 'electricity'
             AND c.entity_id = e.meter_name
+            AND c.meter_id = e.meter_id
         WHERE 1=1
     '''
     params = []
-    
+
     if start_period:
         query += " AND SUBSTR(e.date, 1, 7) >= ?"
         params.append(start_period)
@@ -584,7 +551,10 @@ def get_electricity_readings(
     if meter_name:
         query += " AND e.meter_name = ?"
         params.append(meter_name)
-    
+    if meter_id:
+        query += " AND e.meter_id = ?"
+        params.append(meter_id)
+
     query += " ORDER BY e.date DESC, e.meter_name"
     
     c.execute(query, params)
@@ -597,12 +567,12 @@ def update_electricity_reading(id: int, reading: ElectricityReadingInput) -> boo
     """Update an existing electricity reading."""
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     c.execute('''
-        UPDATE readings_electricity 
-        SET date = ?, meter_name = ?, value = ?, comment = ?
+        UPDATE readings_electricity
+        SET date = ?, meter_name = ?, meter_id = ?, value = ?, comment = ?
         WHERE id = ?
-    ''', (reading.date, reading.meter_name, reading.value, reading.comment, id))
+    ''', (reading.date, reading.meter_name, reading.meter_id, reading.value, reading.comment, id))
     
     updated = c.rowcount > 0
     conn.commit()
@@ -619,26 +589,26 @@ def delete_electricity_reading(id: int) -> bool:
     """Delete an electricity reading."""
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     # Get reading info before deleting
-    c.execute("SELECT meter_name, date FROM readings_electricity WHERE id = ?", (id,))
+    c.execute("SELECT meter_name, meter_id, date FROM readings_electricity WHERE id = ?", (id,))
     reading = c.fetchone()
-    
+
     c.execute("DELETE FROM readings_electricity WHERE id = ?", (id,))
     deleted = c.rowcount > 0
     conn.commit()
-    
+
     if deleted and reading:
         # Delete associated consumption calculation
         period = reading['date'][:7]
         c.execute('''
-            DELETE FROM consumption_calc 
-            WHERE period = ? AND entity_type = 'electricity' AND entity_id = ?
-        ''', (period, reading['meter_name']))
+            DELETE FROM consumption_calc
+            WHERE period = ? AND entity_type = 'electricity' AND entity_id = ? AND meter_id = ?
+        ''', (period, reading['meter_name'], reading['meter_id']))
         conn.commit()
-    
+
     conn.close()
-    
+
     return deleted
 
 # Water CRUD Operations
@@ -646,15 +616,15 @@ def save_water_reading(reading: WaterReadingInput) -> int:
     """Save or update a water reading. Returns the reading ID."""
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     c.execute('''
-        INSERT INTO readings_water (date, room, value, is_warm_water, comment)
-        VALUES (?, ?, ?, ?, ?)
-        ON CONFLICT(date, room, is_warm_water) DO UPDATE SET
+        INSERT INTO readings_water (date, room, meter_id, value, is_warm_water, comment)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(date, room, is_warm_water, meter_id) DO UPDATE SET
             value = excluded.value,
             comment = excluded.comment
         RETURNING id
-    ''', (reading.date, reading.room, reading.value, reading.is_warm_water, reading.comment))
+    ''', (reading.date, reading.room, reading.meter_id, reading.value, reading.is_warm_water, reading.comment))
     
     result = c.fetchone()
     conn.commit()
@@ -692,16 +662,27 @@ def get_water_reading(id: int) -> Optional[Dict[str, Any]]:
     """Get a single water reading by ID."""
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     c.execute('''
         SELECT w.*,
             SUBSTR(w.date, 1, 7) as period,
-            c.consumption_value,
-            c.calculation_details
+            c.calculation_details,
+            warm_agg.consumption_value as warm_water_consumption,
+            cold_agg.consumption_value as cold_water_consumption,
+            COALESCE(warm_agg.consumption_value, 0) + COALESCE(cold_agg.consumption_value, 0) as total_water_consumption
         FROM readings_water w
-        LEFT JOIN consumption_calc c ON SUBSTR(w.date, 1, 7) = c.period 
+        LEFT JOIN consumption_calc c ON SUBSTR(w.date, 1, 7) = c.period
             AND c.entity_type = CASE WHEN w.is_warm_water = 1 THEN 'water_warm' ELSE 'water_cold' END
             AND c.entity_id = w.room
+            AND c.meter_id = w.meter_id
+        LEFT JOIN consumption_calc warm_agg ON SUBSTR(w.date, 1, 7) = warm_agg.period
+            AND warm_agg.entity_type = 'water_warm'
+            AND warm_agg.entity_id = w.room
+            AND warm_agg.meter_id = w.meter_id
+        LEFT JOIN consumption_calc cold_agg ON SUBSTR(w.date, 1, 7) = cold_agg.period
+            AND cold_agg.entity_type = 'water_cold'
+            AND cold_agg.entity_id = w.room
+            AND cold_agg.meter_id = w.meter_id
         WHERE w.id = ?
     ''', (id,))
     
@@ -714,25 +695,37 @@ def get_water_readings(
     start_period: Optional[str] = None,
     end_period: Optional[str] = None,
     room: Optional[str] = None,
-    is_warm_water: Optional[bool] = None
+    is_warm_water: Optional[bool] = None,
+    meter_id: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """Get water readings with optional filters."""
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     query = '''
         SELECT w.*,
             SUBSTR(w.date, 1, 7) as period,
-            c.consumption_value,
-            c.calculation_details
+            c.calculation_details,
+            warm_agg.consumption_value as warm_water_consumption,
+            cold_agg.consumption_value as cold_water_consumption,
+            COALESCE(warm_agg.consumption_value, 0) + COALESCE(cold_agg.consumption_value, 0) as total_water_consumption
         FROM readings_water w
-        LEFT JOIN consumption_calc c ON SUBSTR(w.date, 1, 7) = c.period 
+        LEFT JOIN consumption_calc c ON SUBSTR(w.date, 1, 7) = c.period
             AND c.entity_type = CASE WHEN w.is_warm_water = 1 THEN 'water_warm' ELSE 'water_cold' END
             AND c.entity_id = w.room
+            AND c.meter_id = w.meter_id
+        LEFT JOIN consumption_calc warm_agg ON SUBSTR(w.date, 1, 7) = warm_agg.period
+            AND warm_agg.entity_type = 'water_warm'
+            AND warm_agg.entity_id = w.room
+            AND warm_agg.meter_id = w.meter_id
+        LEFT JOIN consumption_calc cold_agg ON SUBSTR(w.date, 1, 7) = cold_agg.period
+            AND cold_agg.entity_type = 'water_cold'
+            AND cold_agg.entity_id = w.room
+            AND cold_agg.meter_id = w.meter_id
         WHERE 1=1
     '''
     params = []
-    
+
     if start_period:
         query += " AND SUBSTR(w.date, 1, 7) >= ?"
         params.append(start_period)
@@ -745,7 +738,10 @@ def get_water_readings(
     if is_warm_water is not None:
         query += " AND w.is_warm_water = ?"
         params.append(1 if is_warm_water else 0)
-    
+    if meter_id:
+        query += " AND w.meter_id = ?"
+        params.append(meter_id)
+
     query += " ORDER BY w.date DESC, w.room, w.is_warm_water"
     
     c.execute(query, params)
@@ -758,16 +754,16 @@ def update_water_reading(id: int, reading: WaterReadingInput) -> bool:
     """Update an existing water reading."""
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     # Get current reading to check if room/date changed
-    c.execute("SELECT room, date, is_warm_water FROM readings_water WHERE id = ?", (id,))
+    c.execute("SELECT room, date, is_warm_water, meter_id FROM readings_water WHERE id = ?", (id,))
     old_reading = c.fetchone()
-    
+
     c.execute('''
-        UPDATE readings_water 
-        SET date = ?, room = ?, value = ?, is_warm_water = ?, comment = ?
+        UPDATE readings_water
+        SET date = ?, room = ?, meter_id = ?, value = ?, is_warm_water = ?, comment = ?
         WHERE id = ?
-    ''', (reading.date, reading.room, reading.value, reading.is_warm_water, reading.comment, id))
+    ''', (reading.date, reading.room, reading.meter_id, reading.value, reading.is_warm_water, reading.comment, id))
     
     updated = c.rowcount > 0
     conn.commit()
@@ -788,21 +784,21 @@ def delete_water_reading(id: int) -> bool:
     """Delete a water reading."""
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     # Get reading info before deleting
-    c.execute("SELECT room, date, is_warm_water FROM readings_water WHERE id = ?", (id,))
+    c.execute("SELECT room, date, is_warm_water, meter_id FROM readings_water WHERE id = ?", (id,))
     reading = c.fetchone()
-    
+
     c.execute("DELETE FROM readings_water WHERE id = ?", (id,))
     deleted = c.rowcount > 0
     conn.commit()
-    
+
     if deleted and reading:
         # Recalculate consumption for this room and type
         _calculate_water_consumption(conn, reading['room'], reading['date'], reading['is_warm_water'])
-    
+
     conn.close()
-    
+
     return deleted
 
 # Gas CRUD Operations
@@ -810,15 +806,15 @@ def save_gas_reading(reading: GasReadingInput) -> int:
     """Save or update a gas reading. Returns the reading ID."""
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     c.execute('''
-        INSERT INTO readings_gas (date, room, value, comment)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(date, room) DO UPDATE SET
+        INSERT INTO readings_gas (date, room, meter_id, value, comment)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(date, room, meter_id) DO UPDATE SET
             value = excluded.value,
             comment = excluded.comment
         RETURNING id
-    ''', (reading.date, reading.room, reading.value, reading.comment))
+    ''', (reading.date, reading.room, reading.meter_id, reading.value, reading.comment))
     
     result = c.fetchone()
     conn.commit()
@@ -854,16 +850,17 @@ def get_gas_reading(id: int) -> Optional[Dict[str, Any]]:
     """Get a single gas reading by ID."""
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     c.execute('''
-        SELECT g.*, 
+        SELECT g.*,
             SUBSTR(g.date, 1, 7) as period,
             c.consumption_value as consumption,
             c.calculation_details
         FROM readings_gas g
-        LEFT JOIN consumption_calc c ON SUBSTR(g.date, 1, 7) = c.period 
-            AND c.entity_type = 'gas' 
+        LEFT JOIN consumption_calc c ON SUBSTR(g.date, 1, 7) = c.period
+            AND c.entity_type = 'gas'
             AND c.entity_id = g.room
+            AND c.meter_id = g.meter_id
         WHERE g.id = ?
     ''', (id,))
     
@@ -875,25 +872,27 @@ def get_gas_reading(id: int) -> Optional[Dict[str, Any]]:
 def get_gas_readings(
     start_period: Optional[str] = None,
     end_period: Optional[str] = None,
-    room: Optional[str] = None
+    room: Optional[str] = None,
+    meter_id: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """Get gas readings with optional filters."""
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     query = '''
-        SELECT g.*, 
+        SELECT g.*,
             SUBSTR(g.date, 1, 7) as period,
             c.consumption_value as consumption,
             c.calculation_details
         FROM readings_gas g
-        LEFT JOIN consumption_calc c ON SUBSTR(g.date, 1, 7) = c.period 
-            AND c.entity_type = 'gas' 
+        LEFT JOIN consumption_calc c ON SUBSTR(g.date, 1, 7) = c.period
+            AND c.entity_type = 'gas'
             AND c.entity_id = g.room
+            AND c.meter_id = g.meter_id
         WHERE 1=1
     '''
     params = []
-    
+
     if start_period:
         query += " AND SUBSTR(g.date, 1, 7) >= ?"
         params.append(start_period)
@@ -903,7 +902,10 @@ def get_gas_readings(
     if room:
         query += " AND g.room = ?"
         params.append(room)
-    
+    if meter_id:
+        query += " AND g.meter_id = ?"
+        params.append(meter_id)
+
     query += " ORDER BY g.date DESC, g.room"
     
     c.execute(query, params)
@@ -916,12 +918,12 @@ def update_gas_reading(id: int, reading: GasReadingInput) -> bool:
     """Update an existing gas reading."""
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     c.execute('''
-        UPDATE readings_gas 
-        SET date = ?, room = ?, value = ?, comment = ?
+        UPDATE readings_gas
+        SET date = ?, room = ?, meter_id = ?, value = ?, comment = ?
         WHERE id = ?
-    ''', (reading.date, reading.room, reading.value, reading.comment, id))
+    ''', (reading.date, reading.room, reading.meter_id, reading.value, reading.comment, id))
     
     updated = c.rowcount > 0
     conn.commit()
@@ -938,26 +940,26 @@ def delete_gas_reading(id: int) -> bool:
     """Delete a gas reading."""
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     # Get reading info before deleting
-    c.execute("SELECT room, date FROM readings_gas WHERE id = ?", (id,))
+    c.execute("SELECT room, date, meter_id FROM readings_gas WHERE id = ?", (id,))
     reading = c.fetchone()
-    
+
     c.execute("DELETE FROM readings_gas WHERE id = ?", (id,))
     deleted = c.rowcount > 0
     conn.commit()
-    
+
     if deleted and reading:
         # Delete associated consumption calculation
         period = reading['date'][:7]
         c.execute('''
-            DELETE FROM consumption_calc 
-            WHERE period = ? AND entity_type = 'gas' AND entity_id = ?
-        ''', (period, reading['room']))
+            DELETE FROM consumption_calc
+            WHERE period = ? AND entity_type = 'gas' AND entity_id = ? AND meter_id = ?
+        ''', (period, reading['room'], reading['meter_id']))
         conn.commit()
-    
+
     conn.close()
-    
+
     return deleted
 
 # Combined queries
@@ -968,6 +970,65 @@ def get_monthly_readings(period: str) -> Dict[str, List[Dict[str, Any]]]:
         'water': get_water_readings(start_period=period, end_period=period),
         'gas': get_gas_readings(start_period=period, end_period=period)
     }
+
+
+def get_calculation_details_by_type(entity_type: str) -> Dict[str, Any]:
+    """
+    Get calculation details grouped by period for a specific entity type.
+    Returns periods with all meters and their consumption/segment counts.
+    
+    entity_type: 'electricity', 'gas', 'water_warm', 'water_cold', or 'water_total'
+    """
+    import json
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    # Get all calculations for this entity type
+    c.execute('''
+        SELECT period, entity_id, consumption_value, calculation_details
+        FROM consumption_calc
+        WHERE entity_type = ?
+        ORDER BY period DESC, entity_id
+    ''', (entity_type,))
+    
+    rows = c.fetchall()
+    conn.close()
+    
+    # Group by period
+    periods = {}
+    for row in rows:
+        period = row['period']
+        if period not in periods:
+            periods[period] = []
+        
+        # Parse calculation_details to get segment count
+        segment_count = 0
+        if row['calculation_details']:
+            try:
+                calc_details = json.loads(row['calculation_details'])
+                segment_count = calc_details.get('segment_count', 0)
+            except:
+                pass
+        
+        periods[period].append({
+            'entity_id': row['entity_id'],
+            'consumption': row['consumption_value'],
+            'segments': segment_count
+        })
+    
+    # Convert to sorted list
+    sorted_periods = sorted(periods.keys(), reverse=True)
+    result = {
+        'periods': [
+            {
+                'period': period,
+                'meters': periods[period]
+            }
+            for period in sorted_periods
+        ]
+    }
+    
+    return result
 
 def backup_and_reset_db():
     import datetime
@@ -987,46 +1048,46 @@ def reorganize_tables():
     """
     import datetime
     import shutil
-    
+
     backup_path = None
-    
+
     # Create backup first
     if os.path.exists(DB_PATH):
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
         backup_path = f"{DB_PATH}_reorg_backup_{timestamp}.sqlite"
         shutil.copy2(DB_PATH, backup_path)
-    
+
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     try:
         # Reorganize readings_electricity
         c.execute('''
             CREATE TABLE readings_electricity_new AS
             SELECT * FROM readings_electricity
-            ORDER BY date DESC, meter_name
+            ORDER BY date DESC, meter_name, meter_id
         ''')
         c.execute('DROP TABLE readings_electricity')
         c.execute('ALTER TABLE readings_electricity_new RENAME TO readings_electricity')
-        
+
         # Reorganize readings_water
         c.execute('''
             CREATE TABLE readings_water_new AS
             SELECT * FROM readings_water
-            ORDER BY date DESC, room, is_warm_water
+            ORDER BY date DESC, room, is_warm_water, meter_id
         ''')
         c.execute('DROP TABLE readings_water')
         c.execute('ALTER TABLE readings_water_new RENAME TO readings_water')
-        
+
         # Reorganize readings_gas
         c.execute('''
             CREATE TABLE readings_gas_new AS
             SELECT * FROM readings_gas
-            ORDER BY date DESC, room
+            ORDER BY date DESC, room, meter_id
         ''')
         c.execute('DROP TABLE readings_gas')
         c.execute('ALTER TABLE readings_gas_new RENAME TO readings_gas')
-        
+
         # Reorganize consumption_calc
         c.execute('''
             CREATE TABLE consumption_calc_new AS
@@ -1035,19 +1096,23 @@ def reorganize_tables():
         ''')
         c.execute('DROP TABLE consumption_calc')
         c.execute('ALTER TABLE consumption_calc_new RENAME TO consumption_calc')
-        
+
         # Recreate indexes
         c.execute('CREATE INDEX idx_electricity_date ON readings_electricity(date)')
         c.execute('CREATE INDEX idx_electricity_period ON readings_electricity(SUBSTR(date, 1, 7))')
         c.execute('CREATE INDEX idx_electricity_meter ON readings_electricity(meter_name)')
+        c.execute('CREATE INDEX idx_electricity_meter_id ON readings_electricity(meter_id)')
         c.execute('CREATE INDEX idx_water_date ON readings_water(date)')
         c.execute('CREATE INDEX idx_water_period ON readings_water(SUBSTR(date, 1, 7))')
         c.execute('CREATE INDEX idx_water_room ON readings_water(room)')
+        c.execute('CREATE INDEX idx_water_meter_id ON readings_water(meter_id)')
         c.execute('CREATE INDEX idx_gas_date ON readings_gas(date)')
         c.execute('CREATE INDEX idx_gas_period ON readings_gas(SUBSTR(date, 1, 7))')
         c.execute('CREATE INDEX idx_gas_room ON readings_gas(room)')
+        c.execute('CREATE INDEX idx_gas_meter_id ON readings_gas(meter_id)')
         c.execute('CREATE INDEX idx_consumption_period ON consumption_calc(period)')
-        
+        c.execute('CREATE INDEX idx_consumption_meter_id ON consumption_calc(meter_id)')
+
         conn.commit()
         return {"status": "success", "message": "Tables reorganized successfully", "backup_created": backup_path}
     except Exception as e:

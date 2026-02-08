@@ -31,7 +31,8 @@ from db import (
     delete_electricity_reading,
     delete_water_reading,
     delete_gas_reading,
-    get_monthly_readings
+    get_monthly_readings,
+    get_calculation_details_by_type
 )
 from migration import migrate_legacy_data, check_migration_needed, get_migration_status
 
@@ -73,44 +74,44 @@ def add_readings(readings: List[ReadingInput]):
     """Legacy endpoint - saves readings to appropriate tables."""
     import sys
     print(f"DEBUG: Received {len(readings)} readings", flush=True, file=sys.stderr)
-    
+
     count = 0
-    
+
     for reading in readings:
-        print(f"DEBUG: Processing: type={reading.type}, meter={reading.meter}, channel={reading.channel}, value={reading.value}", flush=True, file=sys.stderr)
-        
+        print(f"DEBUG: Processing: type={reading.type}, meter={reading.meter}, channel={reading.channel}, meter_id={reading.meter_id}, value={reading.value}", flush=True, file=sys.stderr)
+
         if reading.type == "electricity":
-            # Use date if provided, otherwise use last day of period
             date = reading.date or f"{reading.period}-01"
             save_electricity_reading(ElectricityReadingInput(
                 date=date,
                 meter_name=reading.meter,
+                meter_id=reading.meter_id or 'UNKNOWN',
                 value=reading.value
             ))
             count += 1
         elif reading.type == "water":
-            # Handle each water reading as separate entry (warm or cold)
             date = reading.date or f"{reading.period}-01"
             is_warm = reading.channel == "warm" or reading.channel is None
-            
+
             save_water_reading(WaterReadingInput(
                 date=date,
                 room=reading.meter,
+                meter_id=reading.meter_id or 'UNKNOWN',
                 value=reading.value,
                 is_warm_water=is_warm
             ))
             count += 1
-            print(f"DEBUG: Saved water reading: room={reading.meter}, warm={is_warm}, value={reading.value}", flush=True, file=sys.stderr)
+            print(f"DEBUG: Saved water reading: room={reading.meter}, warm={is_warm}, meter_id={reading.meter_id}, value={reading.value}", flush=True, file=sys.stderr)
         elif reading.type == "gas":
-            # Use date if provided, otherwise use first day of period
             date = reading.date or f"{reading.period}-01"
             save_gas_reading(GasReadingInput(
                 date=date,
                 room=reading.meter,
+                meter_id=reading.meter_id or 'UNKNOWN',
                 value=reading.value
             ))
             count += 1
-    
+
     return {"status": "success", "count": count}
 
 # Monthly Readings Endpoint
@@ -131,13 +132,15 @@ def get_monthly(period: str):
 def list_electricity(
     start: Optional[str] = Query(None, alias="start"),
     end: Optional[str] = Query(None, alias="end"),
-    meter: Optional[str] = Query(None, alias="meter")
+    meter: Optional[str] = Query(None, alias="meter"),
+    meter_id: Optional[str] = Query(None, alias="meter_id")
 ):
     """List all electricity readings with optional filters."""
     readings = get_electricity_readings(
         start_period=start,
         end_period=end,
-        meter_name=meter
+        meter_name=meter,
+        meter_id=meter_id
     )
     return [ElectricityReading(**r) for r in readings]
 
@@ -185,14 +188,16 @@ def list_water(
     start: Optional[str] = Query(None, alias="start"),
     end: Optional[str] = Query(None, alias="end"),
     room: Optional[str] = Query(None, alias="room"),
-    warm: Optional[bool] = Query(None, alias="warm")
+    warm: Optional[bool] = Query(None, alias="warm"),
+    meter_id: Optional[str] = Query(None, alias="meter_id")
 ):
     """List all water readings with optional filters."""
     readings = get_water_readings(
         start_period=start,
         end_period=end,
         room=room,
-        is_warm_water=warm
+        is_warm_water=warm,
+        meter_id=meter_id
     )
     return [WaterReading(**r) for r in readings]
 
@@ -238,13 +243,15 @@ def delete_water(reading_id: int):
 def list_gas(
     start: Optional[str] = Query(None, alias="start"),
     end: Optional[str] = Query(None, alias="end"),
-    room: Optional[str] = Query(None, alias="room")
+    room: Optional[str] = Query(None, alias="room"),
+    meter_id: Optional[str] = Query(None, alias="meter_id")
 ):
     """List all gas readings with optional filters."""
     readings = get_gas_readings(
         start_period=start,
         end_period=end,
-        room=room
+        room=room,
+        meter_id=meter_id
     )
     return [GasReading(**r) for r in readings]
 
@@ -294,3 +301,72 @@ def reorganize_database():
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Reorganization failed: {str(e)}")
+
+# Calculation Details Endpoints
+@router.get("/calculations/electricity")
+def get_electricity_calculations():
+    """Get electricity consumption calculations grouped by period."""
+    return get_calculation_details_by_type('electricity')
+
+@router.get("/calculations/water")
+def get_water_calculations():
+    """Get water consumption calculations grouped by period."""
+    warm_data = get_calculation_details_by_type('water_warm')
+    cold_data = get_calculation_details_by_type('water_cold')
+    total_data = get_calculation_details_by_type('water_total')
+    
+    # Combine all water types
+    all_periods = set()
+    for p in warm_data['periods']:
+        all_periods.add(p['period'])
+    for p in cold_data['periods']:
+        all_periods.add(p['period'])
+    for p in total_data['periods']:
+        all_periods.add(p['period'])
+    
+    # Build result with all meters per period
+    result_periods = []
+    for period in sorted(all_periods, reverse=True):
+        meters = []
+        
+        # Add warm water meters
+        for p in warm_data['periods']:
+            if p['period'] == period:
+                for m in p['meters']:
+                    meters.append({
+                        'entity_id': f"{m['entity_id']} (Warm)",
+                        'consumption': m['consumption'],
+                        'segments': m['segments']
+                    })
+        
+        # Add cold water meters
+        for p in cold_data['periods']:
+            if p['period'] == period:
+                for m in p['meters']:
+                    meters.append({
+                        'entity_id': f"{m['entity_id']} (Cold)",
+                        'consumption': m['consumption'],
+                        'segments': m['segments']
+                    })
+        
+        # Add total consumption (as separate info)
+        for p in total_data['periods']:
+            if p['period'] == period:
+                for m in p['meters']:
+                    meters.append({
+                        'entity_id': f"{m['entity_id']} (Total)",
+                        'consumption': m['consumption'],
+                        'segments': m['segments']
+                    })
+        
+        result_periods.append({
+            'period': period,
+            'meters': meters
+        })
+    
+    return {'periods': result_periods}
+
+@router.get("/calculations/gas")
+def get_gas_calculations():
+    """Get gas consumption calculations grouped by period."""
+    return get_calculation_details_by_type('gas')

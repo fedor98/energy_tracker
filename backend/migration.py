@@ -308,22 +308,112 @@ def check_consumption_calc_migration_needed() -> bool:
     """Check if migration for consumption_calc values is needed."""
     conn = get_db_connection()
     c = conn.cursor()
-    
+
     try:
         # Check if new columns exist
         c.execute("PRAGMA table_info(consumption_calc)")
         columns = [col['name'] for col in c.fetchall()]
-        
+
         if 'current_value' not in columns or 'previous_value' not in columns:
             return False
-        
+
         # Check if there are null values
         c.execute("SELECT COUNT(*) as count FROM consumption_calc WHERE current_value IS NULL")
         null_count = c.fetchone()['count']
-        
+
         return null_count > 0
-        
+
     except:
         return False
+    finally:
+        conn.close()
+
+
+def migrate_meter_ids_if_needed():
+    """
+    Add meter_id columns to readings tables and populate with default values.
+    This migration is for existing databases that don't have meter_id columns yet.
+    """
+    conn = get_db_connection()
+    c = conn.cursor()
+
+    try:
+        # Check if meter_id column already exists in readings_electricity
+        c.execute("PRAGMA table_info(readings_electricity)")
+        elec_columns = [col['name'] for col in c.fetchall()]
+
+        if 'meter_id' not in elec_columns:
+            print("Adding meter_id column to readings_electricity...")
+            c.execute("ALTER TABLE readings_electricity ADD COLUMN meter_id TEXT NOT NULL DEFAULT 'UNKNOWN'")
+            print("  -> Column added with default value 'UNKNOWN'")
+
+        # Check if meter_id column already exists in readings_water
+        c.execute("PRAGMA table_info(readings_water)")
+        water_columns = [col['name'] for col in c.fetchall()]
+
+        if 'meter_id' not in water_columns:
+            print("Adding meter_id column to readings_water...")
+            c.execute("ALTER TABLE readings_water ADD COLUMN meter_id TEXT NOT NULL DEFAULT 'UNKNOWN'")
+            print("  -> Column added with default value 'UNKNOWN'")
+
+        # Check if meter_id column already exists in readings_gas
+        c.execute("PRAGMA table_info(readings_gas)")
+        gas_columns = [col['name'] for col in c.fetchall()]
+
+        if 'meter_id' not in gas_columns:
+            print("Adding meter_id column to readings_gas...")
+            c.execute("ALTER TABLE readings_gas ADD COLUMN meter_id TEXT NOT NULL DEFAULT 'UNKNOWN'")
+            print("  -> Column added with default value 'UNKNOWN'")
+
+        # Recreate UNIQUE constraints with meter_id
+        # First drop old indexes
+        try:
+            c.execute("DROP INDEX IF EXISTS idx_electricity_date")
+            c.execute("DROP INDEX IF EXISTS idx_electricity_period")
+            c.execute("DROP INDEX IF EXISTS idx_electricity_meter")
+            c.execute("DROP INDEX IF EXISTS idx_water_date")
+            c.execute("DROP INDEX IF EXISTS idx_water_period")
+            c.execute("DROP INDEX IF EXISTS idx_water_room")
+            c.execute("DROP INDEX IF EXISTS idx_gas_date")
+            c.execute("DROP INDEX IF EXISTS idx_gas_period")
+            c.execute("DROP INDEX IF EXISTS idx_gas_room")
+        except Exception:
+            pass
+
+        # Recreate indexes
+        c.execute('CREATE INDEX idx_electricity_date ON readings_electricity(date)')
+        c.execute('CREATE INDEX idx_electricity_period ON readings_electricity(SUBSTR(date, 1, 7))')
+        c.execute('CREATE INDEX idx_electricity_meter ON readings_electricity(meter_name)')
+        c.execute('CREATE INDEX idx_electricity_meter_id ON readings_electricity(meter_id)')
+        c.execute('CREATE INDEX idx_water_date ON readings_water(date)')
+        c.execute('CREATE INDEX idx_water_period ON readings_water(SUBSTR(date, 1, 7))')
+        c.execute('CREATE INDEX idx_water_room ON readings_water(room)')
+        c.execute('CREATE INDEX idx_water_meter_id ON readings_water(meter_id)')
+        c.execute('CREATE INDEX idx_gas_date ON readings_gas(date)')
+        c.execute('CREATE INDEX idx_gas_period ON readings_gas(SUBSTR(date, 1, 7))')
+        c.execute('CREATE INDEX idx_gas_room ON readings_gas(room)')
+        c.execute('CREATE INDEX idx_gas_meter_id ON readings_gas(meter_id)')
+
+        conn.commit()
+        print("Meter ID migration completed successfully!")
+
+    except Exception as e:
+        conn.rollback()
+        print(f"Meter ID migration failed: {e}")
+        raise
+    finally:
+        conn.close()
+
+
+def check_meter_id_migration_needed() -> bool:
+    """Check if meter_id migration is needed."""
+    conn = get_db_connection()
+    c = conn.cursor()
+
+    try:
+        c.execute("PRAGMA table_info(readings_electricity)")
+        elec_columns = [col['name'] for col in c.fetchall()]
+
+        return 'meter_id' not in elec_columns
     finally:
         conn.close()
