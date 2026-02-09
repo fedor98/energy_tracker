@@ -54,12 +54,14 @@
 ## Offen 📋
 
 ### Phase 2: Core Routes (Fortsetzung)
-- [ ] **Setup-Wizard** (`/setup`)
-  - [ ] Step 0: Intro/Welcome
-  - [ ] Step 1: Electricity Konfiguration
-  - [ ] Step 2: Water Konfiguration
-  - [ ] Step 3: Gas Konfiguration
-  - [ ] Speichern der Config
+- [x] **Setup-Wizard** (`/setup`)
+  - [x] Step 0: Intro/Welcome with custom meter ID toggle
+  - [x] Step 1: Electricity Konfiguration (name-based)
+  - [x] Step 2: Water Konfiguration (room + warm/cold toggle)
+  - [x] Step 3: Gas Konfiguration (room-based)
+  - [x] Akkordeon-Ansicht (nur ein Bereich offen)
+  - [x] Speichern der Config via API
+  - [x] Enter-Taste zum Hinzufügen
 - [ ] **Add Reading** (`/add`)
   - [ ] Step 1: Date Selection
   - [ ] Step 2: Electricity Readings
@@ -78,7 +80,9 @@
 ### Phase 4: Navigation & Layout
 - [ ] Header mit Navigation
 - [ ] Aktive Route hervorheben
-- [ ] Setup-Redirect Logik (wenn keine Config)
+- [x] Setup-Redirect Logik (wenn keine Config)
+  - [x] Dashboard redirectet zu /setup wenn keine Config
+  - [x] Setup redirectet zu / wenn Config existiert
 - [ ] Responsive Design (final check)
 
 ### Phase 5: Testing & Polish

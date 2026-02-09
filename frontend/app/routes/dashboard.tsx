@@ -13,6 +13,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import {
@@ -22,6 +23,7 @@ import {
   getElectricityCalculations,
   getWaterCalculations,
   getGasCalculations,
+  getConfig,
 } from '../lib/api';
 import type {
   ElectricityReading,
@@ -172,6 +174,8 @@ function DashboardTabs({ activeTab, onChange }: DashboardTabsProps) {
 }
 
 export default function Dashboard() {
+  const navigate = useNavigate();
+  
   // Filter state for date range selection
   const [startMonth, setStartMonth] = useState<string>('');
   const [endMonth, setEndMonth] = useState<string>('');
@@ -199,7 +203,31 @@ export default function Dashboard() {
   // Loading and error states
   const [loadingReadings, setLoadingReadings] = useState<boolean>(false);
   const [loadingCalculations, setLoadingCalculations] = useState<boolean>(false);
+  const [checkingConfig, setCheckingConfig] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  /**
+   * Check if app is configured on mount - redirect to setup if not
+   */
+  useEffect(() => {
+    async function checkConfig() {
+      try {
+        const config = await getConfig();
+        // If no config exists, redirect to setup
+        if (!config) {
+          navigate('/setup', { replace: true });
+          return;
+        }
+      } catch (err) {
+        // If we can't check config, still show dashboard (fail open)
+        console.error('Failed to check config:', err);
+      } finally {
+        setCheckingConfig(false);
+      }
+    }
+
+    checkConfig();
+  }, [navigate]);
 
   /**
    * Initialize default date range on mount (last 12 months)
@@ -335,6 +363,18 @@ export default function Dashboard() {
         return null;
     }
   };
+
+  // Show loading screen while checking config
+  if (checkingConfig) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard-container min-h-screen bg-gray-50">

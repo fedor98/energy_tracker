@@ -38,6 +38,13 @@ function isElectricityReading(reading: MeterData): reading is ElectricityReading
 }
 
 /**
+ * Type guard to check if a reading is a GasReading
+ */
+function isGasReading(reading: MeterData): reading is GasReading {
+  return 'room' in reading && !('is_warm_water' in reading);
+}
+
+/**
  * Groups meter readings by their period (YYYY-MM format).
  * Returns an object with periods as keys and arrays of readings as values.
  */
@@ -129,7 +136,11 @@ function renderTableRow(
     }
 
     // Gas uses room field
-    return row.room || '-';
+    if (isGasReading(row)) {
+      return row.room || '-';
+    }
+    
+    return '-';
   };
 
   return (

@@ -235,6 +235,80 @@
 
 ---
 
+## 2026-02-08 (Phase 2 - Setup Wizard + Redirects)
+
+### Setup Wizard Implementation
+**Status:** ✅ Abgeschlossen
+
+**Aktivitäten:**
+- API-Typen korrigiert (`frontend/app/lib/api.ts`):
+  - Neue Interfaces: GasMeterConfig, WaterMeterConfig, ElectricityMeterConfig
+  - Struktur an Backend Pydantic Models angepasst (meters-Array statt rooms-Array)
+  - AppConfig refactored für korrekte Nested-Struktur
+
+- Setup Route erstellt (`frontend/app/routes/setup.tsx`):
+  - Intro-Screen mit Custom Meter ID Toggle
+  - Akkordeon-Ansicht mit nur einem offenen Bereich
+  - Footer mit "Back" und "Finish Setup" Buttons
+  - Validation: Mindestens ein Meter muss konfiguriert sein
+  - API-Integration zum Speichern via initConfig()
+  - **Redirect-Logik**: Prüft bei Mount ob Config existiert, redirectet zu Dashboard wenn ja
+
+- Dashboard Route aktualisiert (`frontend/app/routes/dashboard.tsx`):
+  - **Redirect-Logik**: Prüft bei Mount ob Config existiert, redirectet zu Setup wenn nein
+  - Loading-State während Config-Check
+
+- Akkordeon-Komponente (`frontend/app/components/AccordionSection.tsx`):
+  - Wiederverwendbare Section mit Toggle
+  - Badge-Anzeige für Anzahl konfigurierter Meter
+  - Visuelle States (offen/geschlossen)
+
+- Meter-Konfigurations-Komponenten:
+  - **ElectricitySetup**: Name-basiert, Enter-Taste zum Hinzufügen
+  - **WaterSetup**: Raum + Warm/Kalt Toggle (🔴/🔵)
+  - **GasSetup**: Raum-basiert (Layout-Vorlage für alle)
+  - Alle unterstützen: Hinzufügen, Entfernen, Custom Meter IDs
+
+- Routes aktualisiert (`frontend/app/routes.ts`):
+  - Neue Route `/setup` hinzugefügt
+
+- Toggle-Komponente überarbeitet (Legacy-Styles):
+  - **Toggle** (`frontend/app/components/Toggle.tsx`): Flexible Toggle-Komponente mit zwei Varianten
+    - `variant="standard"`: Einfacher On/Off Toggle (grün/grau) - für Custom Meter IDs
+    - `variant="water"`: Spezial-Toggle mit blau/rot und Labels für Warm/Kalt
+  - Exakte Maße vom Legacy übernommen: 2.75rem x 1.5rem Container, 1.25rem Slider
+  - Korrekte Cursor-Pointer auf allen interaktiven Elementen
+  - Box-Shadow und Transition-Effects vom Original
+
+**Entscheidungen:**
+- Akkordeon statt Step-by-Step (wie explizit gewünscht)
+- Gas-Layout als Basis für alle (konsistente UX)
+- Enter-Taste zum Hinzufügen (wie gewünscht)
+- Unicode-Icons statt lucide-react (keine neue Dependency)
+- Tailwind für Layout/States, semantische Klassen für Struktur
+- Redirects mit `replace: true` für saubere Browser-History
+- Fail-open Strategy: Bei API-Fehlern wird Setup/Dashboard trotzdem angezeigt
+- Toggle-Styles 1:1 vom Legacy übernommen (Maße, Farben, Animationen)
+
+**Geänderte Dateien:**
+- `frontend/app/lib/api.ts` (API-Typen korrigiert)
+- `frontend/app/routes/setup.tsx` (+ Redirect-Logik, Toggle)
+- `frontend/app/routes/dashboard.tsx` (+ Redirect-Logik)
+- `frontend/app/routes.ts` (+ setup route)
+- `frontend/app/components/AccordionSection.tsx` (neu)
+- `frontend/app/components/ElectricitySetup.tsx` (neu)
+- `frontend/app/components/WaterSetup.tsx` (neu - nutzt Toggle)
+- `frontend/app/components/GasSetup.tsx` (neu)
+- `frontend/app/components/Toggle.tsx` (neu - Legacy-Style, 2 Varianten)
+- `frontend_old_mounted_to_python/TODO.md` (Tasks aktualisiert)
+- `frontend_old_mounted_to_python/WORKLOG.md` (Dokumentation)
+
+**Nächste Schritte:**
+- Add Reading Route (`/add`)
+- Settings Route mit Reset-Funktion
+
+---
+
 ## Format für neue Einträge
 
 ```markdown
