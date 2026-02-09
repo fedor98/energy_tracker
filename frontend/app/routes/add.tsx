@@ -205,11 +205,11 @@ export default function AddReading() {
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer relative z-20"
                 style={{ WebkitAppearance: 'none' }}
               />
               <div
-                className="absolute inset-0 cursor-pointer"
+                className="absolute inset-0 cursor-pointer sm:block hidden"
                 onClick={() => dateInputRef.current?.showPicker?.()}
                 style={{ zIndex: 10 }}
               />
