@@ -309,6 +309,75 @@
 
 ---
 
+## 2026-02-09 (Dashboard Action Buttons + Add Reading Redesign)
+
+### Dashboard Action Buttons & Add Reading Route
+**Status:** ✅ Abgeschlossen
+
+**Aktivitäten:**
+- Dashboard Action Buttons hinzugefügt (`frontend/app/routes/dashboard.tsx`):
+  - "Add Reading" Button (emerald-100/emerald-700, pill-shaped)
+  - "Reset Meter" Button (orange-100/orange-700, pill-shaped, Dummy)
+  - Position: Unter der Filter Card auf grauem Hintergrund
+  - Icons (Plus, RotateCcw) via lucide-react Library
+  - Responsive: Rechtsbündig ausgerichtet
+
+- Add Reading Route komplett redesignt (`frontend/app/routes/add.tsx`):
+  - Linearer 4-Schritt Wizard ersetzt durch Accordion-Layout
+  - Struktur: Date Card (oben) → Electricity → Water → Gas (AccordionSections)
+  - Date Section: Nur Measurement Date (Billing Period entfernt)
+  - Date-Picker: Ganze Fläche klickbar via Overlay + showPicker()
+  - Badge zeigt Anzahl eingegebener Readings pro Typ
+  - Validierung: Mindestens ein Reading erforderlich
+  - Footer zeigt Gesamtanzahl eingegebener Readings
+  - Atomic save via Bulk API
+
+- Setup-Komponenten erweitert (Dual-Mode):
+  - Neue Props: `mode`, `readings`, `onReadingChange`
+  - Setup Mode: Konfiguration von Metern (Hinzufügen/Entfernen)
+  - Reading Mode: Eingabe von Zählerständen für konfigurierte Meter
+  - Water: Emojis (🔴/🔵) statt Text für Warm/Kalt Indikatoren
+
+- Komponenten umbenannt:
+  - `ElectricitySetup.tsx` → `ElectricityMeterForm.tsx`
+  - `WaterSetup.tsx` → `WaterMeterForm.tsx`
+  - `GasSetup.tsx` → `GasMeterForm.tsx`
+  - Alle Imports aktualisiert in `add.tsx` und `setup.tsx`
+
+- Alte Komponenten entfernt:
+  - `StepIndicator.tsx` (nicht mehr benötigt)
+  - `ReadingForm.tsx` (nicht mehr benötigt)
+
+- API Typ aktualisiert:
+  - `ReadingInput` um `meter_id` erweitert
+
+**Entscheidungen:**
+- Accordion-Layout für einheitliches Design mit Setup
+- Komponenten-Erweiterung statt Duplizierung (DRY-Prinzip)
+- Billing Period entfernt (nicht vom Backend benötigt)
+- Nur eine AccordionSection gleichzeitig offen (wie im Setup)
+- Date-Picker verbessert für bessere UX (kein kleines Icon-Klicken nötig)
+- Emojis in gleicher Größe wie Text für Konsistenz
+- Pill-shaped Buttons mit dezenten Farben für moderneres Design
+
+**Geänderte Dateien:**
+- `frontend/app/routes/dashboard.tsx` (+ Action Buttons, lucide-react Import)
+- `frontend/app/routes/add.tsx` (komplett überarbeitet - Accordion Layout)
+- `frontend/app/routes/setup.tsx` (Imports aktualisiert)
+- `frontend/app/components/ElectricityMeterForm.tsx` (neu, ersetzt ElectricitySetup)
+- `frontend/app/components/WaterMeterForm.tsx` (neu, ersetzt WaterSetup)
+- `frontend/app/components/GasMeterForm.tsx` (neu, ersetzt GasSetup)
+- `frontend/app/lib/api.ts` (+ meter_id in ReadingInput)
+- `frontend/package.json` (+ lucide-react Dependency)
+- `frontend_old_mounted_to_python/TODO.md` (Tasks abgehakt)
+- `frontend_old_mounted_to_python/WORKLOG.md` (Dokumentation)
+
+**Nächste Schritte:**
+- Edit Reading Route (`/edit/:period`)
+- Settings Route mit Reset-Funktion
+
+---
+
 ## Format für neue Einträge
 
 ```markdown

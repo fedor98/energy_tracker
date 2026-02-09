@@ -1,49 +1,67 @@
 /**
- * GasSetup Component
+ * ElectricityMeterForm Component
  * 
- * Configures gas meters for the setup wizard.
- * Allows adding meters per room. This is the base layout pattern
- * also used for Water and Electricity setup for consistency.
+ * Dual-mode component for both setup and reading entry.
+ * 
+ * Setup Mode (mode='setup'):
+ * - Configures electricity meters for the setup wizard
+ * - Allows adding/removing multiple meters with custom names and meter IDs
+ * 
+ * Reading Mode (mode='reading'):
+ * - Displays input fields for entering readings from configured meters
+ * - Shows meter name and allows entering kWh values
+ * 
+ * Uses the same layout pattern as Gas and Water forms for consistency.
  */
 
 import React, { useState } from 'react';
-import type { GasMeterConfig } from '../lib/api';
+import type { ElectricityMeterConfig } from '../lib/api';
 
-interface GasSetupProps {
-  meters: GasMeterConfig[];
-  onChange: (meters: GasMeterConfig[]) => void;
+interface ElectricityMeterFormProps {
+  meters: ElectricityMeterConfig[];
+  onChange: (meters: ElectricityMeterConfig[]) => void;
   useCustomMeterIds: boolean;
+  mode?: 'setup' | 'reading';
+  readings?: Record<string, string>; // meter_id -> value
+  onReadingChange?: (meterId: string, value: string) => void;
 }
 
-export function GasSetup({ meters, onChange, useCustomMeterIds }: GasSetupProps) {
-  const [room, setRoom] = useState('');
+export function ElectricityMeterForm({ 
+  meters, 
+  onChange, 
+  useCustomMeterIds,
+  mode = 'setup',
+  readings = {},
+  onReadingChange
+}: ElectricityMeterFormProps) {
+  const [name, setName] = useState('');
   const [meterId, setMeterId] = useState('');
 
   // Generate a unique meter ID
   function generateMeterId(): string {
-    return 'G-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+    return 'E-' + Math.random().toString(36).substring(2, 8).toUpperCase();
   }
 
-  // Add a new gas meter
+  // Add a new electricity meter (setup mode only)
   function addMeter() {
-    if (!room.trim()) return;
+    if (!name.trim()) return;
     
-    const newMeter: GasMeterConfig = {
-      room: room.trim(),
+    const newMeter: ElectricityMeterConfig = {
+      name: name.trim(),
       meter_id: useCustomMeterIds && meterId.trim() ? meterId.trim() : generateMeterId()
     };
     
     onChange([...meters, newMeter]);
-    setRoom('');
+    setName('');
     setMeterId('');
   }
 
-  // Remove a meter by index
+  // Remove a meter by index (setup mode only)
   function removeMeter(index: number) {
     onChange(meters.filter((_, i) => i !== index));
   }
 
-  // Handle Enter key press
+  // Handle Enter key press (setup mode only)
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -51,6 +69,36 @@ export function GasSetup({ meters, onChange, useCustomMeterIds }: GasSetupProps)
     }
   }
 
+  // Reading Mode: Display input fields for existing meters
+  if (mode === 'reading') {
+    return (
+      <div className="space-y-4">
+        {meters.length > 0 ? (
+          meters.map((meter) => (
+            <div key={meter.meter_id} className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                {meter.name} <span className="text-gray-500 font-normal">(kWh)</span>
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                value={readings[meter.meter_id] || ''}
+                onChange={(e) => onReadingChange?.(meter.meter_id, e.target.value)}
+                placeholder="Enter reading"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          ))
+        ) : (
+          <p className="text-sm text-gray-500 text-center py-4">
+            No electricity meters configured. Configure meters in Settings.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // Setup Mode: Configure meters
   return (
     <div className="space-y-4">
       {/* Input Section */}
@@ -60,10 +108,10 @@ export function GasSetup({ meters, onChange, useCustomMeterIds }: GasSetupProps)
         <div className="space-y-3">
           <input
             type="text"
-            value={room}
-            onChange={(e) => setRoom(e.target.value)}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Room Name (e.g., Living Room, Kitchen)"
+            placeholder="Meter Name (e.g., Main Meter, Solar)"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           
@@ -80,7 +128,7 @@ export function GasSetup({ meters, onChange, useCustomMeterIds }: GasSetupProps)
           
           <button
             onClick={addMeter}
-            disabled={!room.trim()}
+            disabled={!name.trim()}
             className="w-full py-2 px-4 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
           >
             + Add Meter
@@ -98,7 +146,7 @@ export function GasSetup({ meters, onChange, useCustomMeterIds }: GasSetupProps)
               className="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-md"
             >
               <div className="flex flex-col">
-                <span className="font-medium text-gray-800">{meter.room}</span>
+                <span className="font-medium text-gray-800">{meter.name}</span>
                 {meter.meter_id && (
                   <span className="text-xs text-gray-500 font-mono">ID: {meter.meter_id}</span>
                 )}
@@ -117,7 +165,7 @@ export function GasSetup({ meters, onChange, useCustomMeterIds }: GasSetupProps)
       {/* Empty State */}
       {meters.length === 0 && (
         <p className="text-sm text-gray-500 text-center py-4">
-          No gas meters configured yet. Add at least one meter to continue.
+          No electricity meters configured yet. Add at least one meter to continue.
         </p>
       )}
     </div>

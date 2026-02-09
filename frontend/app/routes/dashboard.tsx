@@ -14,6 +14,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
+import { Plus, RotateCcw } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import {
@@ -460,6 +461,24 @@ export default function Dashboard() {
             </div>
           </div>
         </Card>
+
+        {/* Action Buttons - directly on gray background */}
+        <div className="flex justify-end gap-3 mt-4 mb-6">
+          <button
+            onClick={() => navigate('/add')}
+            className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 font-medium text-sm rounded-full transition-colors"
+          >
+            <Plus className="w-4 h-4" />
+            Add Reading
+          </button>
+          <button
+            onClick={() => {/* TODO: Implement meter reset functionality */}}
+            className="inline-flex items-center gap-2 px-3 py-1.5 bg-orange-100 hover:bg-orange-200 text-orange-700 font-medium text-sm rounded-full transition-colors"
+          >
+            <RotateCcw className="w-4 h-4" />
+            Reset Meter
+          </button>
+        </div>
 
         {/* Error Display */}
         {error && (

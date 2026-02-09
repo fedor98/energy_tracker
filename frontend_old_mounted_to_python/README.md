@@ -16,6 +16,9 @@ energy_consumption/
 │   │   ├── components/     # Wiederverwendbare UI-Komponenten
 │   │   ├── lib/           # API-Layer, Utilities
 │   │   ├── routes/        # React Router Routes
+│   │   │   ├── dashboard.tsx    # Main dashboard with charts and tables
+│   │   │   ├── setup.tsx        # Initial configuration wizard
+│   │   │   └── add.tsx          # [NEW] Multi-step reading entry wizard
 │   │   └── styles/        # CSS-Komponenten
 │   └── nginx/             # Production-Build Serving
 │
@@ -28,10 +31,48 @@ energy_consumption/
         └── views/         # Page-Komponenten
             ├── setup.js
             ├── dashboard.js
-            ├── add_reading.js
+            ├── add_reading.js    # Legacy - migrated to React
             ├── edit_reading.js
             └── settings.js
 ```
+
+## Migration Status
+
+### Phase 2: Add Reading Route ✅ (2026-02-09) - REDESIGNED
+
+Die `/add` Route wurde erfolgreich von Vanilla JS zu React migriert und anschließend redesignt:
+
+**Ursprüngliche Migration:**
+- **Legacy**: `js/views/add_reading.js` (135 Zeilen)
+- **Erste Version**: Linearer 4-Schritt Wizard mit StepIndicator
+
+**Redesign mit Accordion-Struktur:**
+- **Neu**: Accordion-Layout (einheitlich mit Setup)
+- **Struktur**: Date Card (oben) → Electricity → Water → Gas (AccordionSections)
+- **Setup-Komponenten**: Erweitert mit `mode='reading'` für Dual-Use
+
+#### Erweiterte Komponenten (Setup + Reading Mode)
+- `ElectricityMeterForm.tsx` - Unterstützt 'setup' und 'reading' Modus
+- `WaterMeterForm.tsx` - Unterstützt 'setup' und 'reading' Modus
+- `GasMeterForm.tsx` - Unterstützt 'setup' und 'reading' Modus
+
+#### Features
+- Accordion pattern (nur eine Section gleichzeitig offen)
+- Badge zeigt Anzahl eingegebener Readings pro Typ
+- Validierung: Mindestens ein Reading erforderlich
+- Atomic save via Bulk API
+- Gelöscht: `StepIndicator.tsx`, `ReadingForm.tsx`
+
+#### Dashboard-Updates
+- Neue Action-Buttons: "Add Reading" (+ Icon) und "Reset Meter" (↻ Icon)
+- Responsive Layout unter der Filter Card
+- Pill-shaped Design mit dezenten Farben
+- Icons via `lucide-react` Library
+
+### TODOs
+- [ ] Reset Meter Button: Funktionalität implementieren
+- [ ] Edit Reading Route erstellen
+- [ ] Settings Route erstellen
 
 ## API-Endpunkte (Backend)
 

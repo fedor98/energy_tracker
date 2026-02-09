@@ -1,22 +1,39 @@
 /**
- * WaterSetup Component
+ * WaterMeterForm Component
  * 
- * Configures water meters for the setup wizard.
- * Allows adding meters per room with a warm/cold water toggle.
- * Each room can have both warm and cold water meters.
+ * Dual-mode component for both setup and reading entry.
+ * 
+ * Setup Mode (mode='setup'):
+ * - Configures water meters for the setup wizard
+ * - Allows adding/removing meters per room with warm/cold water toggle
+ * - Each room can have both warm and cold water meters
+ * 
+ * Reading Mode (mode='reading'):
+ * - Displays input fields for entering readings from configured meters
+ * - Shows room name with warm/cold indicator and allows entering m³ values
  */
 
 import React, { useState } from 'react';
 import { Toggle } from './Toggle';
 import type { WaterMeterConfig } from '../lib/api';
 
-interface WaterSetupProps {
+interface WaterMeterFormProps {
   meters: WaterMeterConfig[];
   onChange: (meters: WaterMeterConfig[]) => void;
   useCustomMeterIds: boolean;
+  mode?: 'setup' | 'reading';
+  readings?: Record<string, string>; // meter_id -> value
+  onReadingChange?: (meterId: string, value: string) => void;
 }
 
-export function WaterSetup({ meters, onChange, useCustomMeterIds }: WaterSetupProps) {
+export function WaterMeterForm({ 
+  meters, 
+  onChange, 
+  useCustomMeterIds,
+  mode = 'setup',
+  readings = {},
+  onReadingChange
+}: WaterMeterFormProps) {
   const [room, setRoom] = useState('');
   const [isWarmWater, setIsWarmWater] = useState(false);
   const [meterId, setMeterId] = useState('');
@@ -26,7 +43,7 @@ export function WaterSetup({ meters, onChange, useCustomMeterIds }: WaterSetupPr
     return 'W-' + Math.random().toString(36).substring(2, 8).toUpperCase();
   }
 
-  // Add a new water meter
+  // Add a new water meter (setup mode only)
   function addMeter() {
     if (!room.trim()) return;
     
@@ -42,12 +59,12 @@ export function WaterSetup({ meters, onChange, useCustomMeterIds }: WaterSetupPr
     // Keep warm/cold setting for convenience when adding multiple meters
   }
 
-  // Remove a meter by index
+  // Remove a meter by index (setup mode only)
   function removeMeter(index: number) {
     onChange(meters.filter((_, i) => i !== index));
   }
 
-  // Handle Enter key press
+  // Handle Enter key press (setup mode only)
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -55,6 +72,40 @@ export function WaterSetup({ meters, onChange, useCustomMeterIds }: WaterSetupPr
     }
   }
 
+  // Reading Mode: Display input fields for existing meters
+  if (mode === 'reading') {
+    return (
+      <div className="space-y-4">
+        {meters.length > 0 ? (
+          meters.map((meter) => (
+            <div key={meter.meter_id} className="space-y-2">
+              <label className="block text-sm font-medium text-gray-700">
+                {meter.room}{' '}
+                <span className={meter.is_warm_water ? 'text-red-500' : 'text-blue-500'}>
+                  {meter.is_warm_water ? '🔴' : '🔵'}
+                </span>{' '}
+                <span className="text-gray-500 font-normal">(m³)</span>
+              </label>
+              <input
+                type="number"
+                step="0.001"
+                value={readings[meter.meter_id] || ''}
+                onChange={(e) => onReadingChange?.(meter.meter_id, e.target.value)}
+                placeholder="Enter reading"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          ))
+        ) : (
+          <p className="text-sm text-gray-500 text-center py-4">
+            No water meters configured. Configure meters in Settings.
+          </p>
+        )}
+      </div>
+    );
+  }
+
+  // Setup Mode: Configure meters
   return (
     <div className="space-y-4">
       {/* Input Section */}

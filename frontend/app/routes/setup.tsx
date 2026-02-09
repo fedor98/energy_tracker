@@ -16,9 +16,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { AccordionSection } from '../components/AccordionSection';
-import { ElectricitySetup } from '../components/ElectricitySetup';
-import { WaterSetup } from '../components/WaterSetup';
-import { GasSetup } from '../components/GasSetup';
+import { ElectricityMeterForm } from '../components/ElectricityMeterForm';
+import { WaterMeterForm } from '../components/WaterMeterForm';
+import { GasMeterForm } from '../components/GasMeterForm';
 import { Toggle } from '../components/Toggle';
 import { initConfig, getConfig, type AppConfig } from '../lib/api';
 
@@ -219,7 +219,7 @@ export default function Setup() {
               onToggle={() => toggleSection('electricity')}
               badge={config.electricity.meters.length}
             >
-              <ElectricitySetup
+              <ElectricityMeterForm
                 meters={config.electricity.meters}
                 onChange={updateElectricityMeters}
                 useCustomMeterIds={useCustomMeterIds}
@@ -234,7 +234,7 @@ export default function Setup() {
               onToggle={() => toggleSection('water')}
               badge={config.water.meters.length}
             >
-              <WaterSetup
+              <WaterMeterForm
                 meters={config.water.meters}
                 onChange={updateWaterMeters}
                 useCustomMeterIds={useCustomMeterIds}
@@ -249,7 +249,7 @@ export default function Setup() {
               onToggle={() => toggleSection('gas')}
               badge={config.gas.meters.length}
             >
-              <GasSetup
+              <GasMeterForm
                 meters={config.gas.meters}
                 onChange={updateGasMeters}
                 useCustomMeterIds={useCustomMeterIds}
