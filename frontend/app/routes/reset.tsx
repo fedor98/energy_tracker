@@ -98,7 +98,7 @@ export default function ResetMeter() {
 
   // Count resets with last_reading entered for a type
   function countResets(type: 'electricity' | 'water' | 'gas'): number {
-    return Object.values(resets[type]).filter(r => r.last_reading.trim() !== '').length;
+    return Object.values(resets[type]).filter(r => r.last_reading?.trim() !== '').length;
   }
 
   // Check if at least one reset has been configured
@@ -128,14 +128,14 @@ export default function ResetMeter() {
 
       // Collect electricity resets
       Object.entries(resets.electricity).forEach(([meterId, data]) => {
-        if (data.last_reading.trim()) {
+        if (data.last_reading?.trim()) {
           const meter = config?.electricity.meters.find(m => m.meter_id === meterId);
           if (meter) {
             resetInput.electricity.push({
               meter_id: meterId,
               meter_name: meter.name,
               last_reading: parseFloat(data.last_reading),
-              reset_value: data.reset_value.trim() ? parseFloat(data.reset_value) : 0
+              reset_value: data.reset_value?.trim() ? parseFloat(data.reset_value) : 0
             });
           }
         }
@@ -143,7 +143,7 @@ export default function ResetMeter() {
 
       // Collect water resets
       Object.entries(resets.water).forEach(([meterId, data]) => {
-        if (data.last_reading.trim()) {
+        if (data.last_reading?.trim()) {
           const meter = config?.water.meters.find(m => m.meter_id === meterId);
           if (meter) {
             resetInput.water.push({
@@ -151,7 +151,7 @@ export default function ResetMeter() {
               room: meter.room,
               is_warm_water: meter.is_warm_water,
               last_reading: parseFloat(data.last_reading),
-              reset_value: data.reset_value.trim() ? parseFloat(data.reset_value) : 0
+              reset_value: data.reset_value?.trim() ? parseFloat(data.reset_value) : 0
             });
           }
         }
@@ -159,14 +159,14 @@ export default function ResetMeter() {
 
       // Collect gas resets
       Object.entries(resets.gas).forEach(([meterId, data]) => {
-        if (data.last_reading.trim()) {
+        if (data.last_reading?.trim()) {
           const meter = config?.gas.meters.find(m => m.meter_id === meterId);
           if (meter) {
             resetInput.gas.push({
               meter_id: meterId,
               room: meter.room,
               last_reading: parseFloat(data.last_reading),
-              reset_value: data.reset_value.trim() ? parseFloat(data.reset_value) : 0
+              reset_value: data.reset_value?.trim() ? parseFloat(data.reset_value) : 0
             });
           }
         }

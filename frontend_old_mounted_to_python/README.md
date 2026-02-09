@@ -96,6 +96,45 @@ Die `/reset` Route wurde implementiert und anschließend refactored:
 - Water: Emojis (🔴/🔵) statt Text für Warm/Kalt
 - Einheitliches Design zwischen /add und /reset
 
+### Phase 4: Generic Meter Form Architecture ✅ (2026-02-09)
+
+**Problem:** Massive Code-Duplikation in den drei MeterForm-Komponenten (~85% identisch)
+
+**Lösung:** Vollständige Refactoring auf generische Architektur
+
+#### Neue Struktur
+```
+frontend/app/components/meter-forms/
+├── types.ts                 # Gemeinsame Typen & Konfiguration
+├── GenericMeterForm.tsx     # Hauptkomponente (Strategy Pattern)
+├── SetupModeRenderer.tsx    # Setup-Modus UI
+├── ReadingModeRenderer.tsx  # Reading-Modus UI
+├── ResetModeRenderer.tsx    # Reset-Modus UI
+├── useMeterForm.ts          # Custom Hooks
+└── index.ts                 # Barrel Export
+```
+
+#### Code-Reduktion
+| Datei | Vorher | Nachher | Einsparung |
+|-------|--------|---------|------------|
+| GasMeterForm.tsx | 244 | 49 | -80% |
+| WaterMeterForm.tsx | 267 | 49 | -82% |
+| ElectricityMeterForm.tsx | 244 | 49 | -80% |
+| **Gesamt** | **755** | **147** | **-81%** |
+
+#### Implementierte Patterns
+- **Strategy Pattern**: Modus-spezifisches Rendering
+- **Configuration-Driven**: `METER_TYPE_CONFIGS` Record
+- **Generic Types**: TypeScript Generics für Type-Safety
+- **Composition**: UI-Komponenten komponierbar
+
+#### Vorteile
+- ✨ DRY-Prinzip: UI-Code zentralisiert
+- 🔧 Wartbarkeit: Design-Änderungen an einer Stelle
+- 🚀 Erweiterbarkeit: Neue Typen in ~50 Zeilen
+- ✅ Type-Safe: Compile-time Checks
+- 🧪 Testbar: Renderer einzeln testbar
+
 ### TODOs
 - [ ] Reset Meter Button: Funktionalität implementieren
 - [ ] Edit Reading Route erstellen

@@ -429,6 +429,81 @@
 
 ---
 
+## 2026-02-09 (Generic Meter Form Architecture)
+
+### Code Refactoring - DRY Principle Implementation
+**Status:** ✅ Abgeschlossen
+
+**Problem:**
+- Drei nahezu identische MeterForm-Komponenten (GasMeterForm, WaterMeterForm, ElectricityMeterForm)
+- Jede Komponente ~250 Zeilen mit 85% identischem Code
+- Hoher Wartungsaufwand bei Design-Änderungen
+- Riskantes "Copy-Paste-Drift"-Problem
+
+**Lösung - Generic Component Architecture:**
+
+1. **Neue Verzeichnisstruktur** (`frontend/app/components/meter-forms/`):
+   - `types.ts` - Gemeinsame Typen und Konfiguration
+   - `GenericMeterForm.tsx` - Hauptkomponente (Strategy Pattern)
+   - `SetupModeRenderer.tsx` - Setup-Modus UI
+   - `ReadingModeRenderer.tsx` - Reading-Modus UI
+   - `ResetModeRenderer.tsx` - Reset-Modus UI
+   - `useMeterForm.ts` - Custom Hooks für State-Management
+   - `index.ts` - Barrel Export
+
+2. **Configuration-Driven Development:**
+   - `MeterTypeConfig` Interface definiert type-spezifische Eigenschaften
+   - `METER_TYPE_CONFIGS` Record mit Konfiguration für alle Typen
+   - Einheitliche Einheiten, Schrittweiten, Placeholder-Texte, etc.
+
+3. **Strategy Pattern für Modus-Rendering:**
+   - Jeder Modus (setup/reading/reset) hat eigenen Renderer
+   - Mode-Registry: `modeRenderers: Record<FormMode, React.FC>`
+   - Einfache Erweiterbarkeit durch neue Renderer
+
+**Ergebnisse:**
+| Metrik | Vorher | Nachher | Einsparung |
+|--------|--------|---------|------------|
+| GasMeterForm | 244 Zeilen | 49 Zeilen | -80% |
+| WaterMeterForm | 267 Zeilen | 49 Zeilen | -82% |
+| ElectricityMeterForm | 244 Zeilen | 49 Zeilen | -80% |
+| **Gesamt (Components)** | ~755 Zeilen | ~147 Zeilen | **-81%** |
+| **Neue Infrastruktur** | - | 689 Zeilen | Wiederverwendbar |
+
+**Implementierte Patterns:**
+- Strategy Pattern für Modus-spezifisches Rendering
+- Configuration-Driven Development via `METER_TYPE_CONFIGS`
+- Generic TypeScript Types für Type-Safety
+- Composition Pattern für UI-Komponenten
+
+**Geänderte Dateien:**
+- `frontend/app/components/meter-forms/` (neues Verzeichnis, 7 Dateien)
+- `frontend/app/components/GasMeterForm.tsx` (refactored - 49 Zeilen)
+- `frontend/app/components/WaterMeterForm.tsx` (refactored - 49 Zeilen)
+- `frontend/app/components/ElectricityMeterForm.tsx` (refactored - 49 Zeilen)
+- `frontend/app/routes/reset.tsx` (Bugfix: Optional chaining für `last_reading?.trim()`)
+- `frontend_old_mounted_to_python/TODO.md` (Tasks aktualisiert)
+- `frontend_old_mounted_to_python/WORKLOG.md` (Dokumentation)
+- `frontend_old_mounted_to_python/README.md` (Dokumentation)
+
+**TypeScript:**
+- Build erfolgreich: `npm run build` ✅
+- Type-Check erfolgreich: `npm run typecheck` ✅
+- Keine Breaking Changes zur bestehenden API
+
+**Vorteile der neuen Architektur:**
+1. **DRY-Prinzip**: UI-Code jetzt an einem Ort zentralisiert
+2. **Wartbarkeit**: Design-Änderungen erfordern nur eine Datei-Änderung
+3. **Erweiterbarkeit**: Neue Metertypen benötigen nur ~50 Zeilen Code
+4. **Type-Safety**: Generics garantieren korrekte Typisierung
+5. **Testbarkeit**: Mode-Renderer können einzeln getestet werden
+
+**Nächste Schritte:**
+- Edit Reading Route (`/edit/:period`)
+- Settings Route mit Reset-Funktion
+
+---
+
 ## Format für neue Einträge
 
 ```markdown
