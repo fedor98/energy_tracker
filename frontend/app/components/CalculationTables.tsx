@@ -29,6 +29,7 @@ interface TableSectionProps {
 /**
  * Renders a single calculation table for one utility type.
  * Dynamically adjusts columns based on available meters.
+ * Uses consistent styling with MeterDataTable.
  */
 function CalcTableSection({ title, icon, unit, data }: TableSectionProps) {
   // Handle empty data state
@@ -64,6 +65,9 @@ function CalcTableSection({ title, icon, unit, data }: TableSectionProps) {
     return meterName;
   };
 
+  const headerClass = 'px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider';
+  const cellClass = 'px-4 py-3 text-sm';
+
   return (
     <div className="mb-8 last:mb-0">
       <h3 className="text-lg font-semibold mb-4 pb-2 border-b-2 border-indigo-600">
@@ -73,48 +77,23 @@ function CalcTableSection({ title, icon, unit, data }: TableSectionProps) {
       {/* Horizontal scroll container for mobile */}
       <div className="overflow-x-auto">
         <table className="data-table min-w-full">
-          <thead>
-            <tr className="bg-gray-50">
-              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
-                Period
-              </th>
-
-              {/* Dynamic meter columns - each meter has consumption + segments */}
+          <thead className="bg-gray-50">
+            <tr>
+              <th className={headerClass}>Period</th>
+              
+              {/* Header columns: Meter (unit) + Segs for each meter */}
               {meterList.map((meter) => (
-                <th
-                  key={meter}
-                  colSpan={2}
-                  className="px-4 py-3 text-center text-xs font-semibold text-gray-600 uppercase tracking-wider border-l border-gray-200"
-                >
-                  {formatMeterName(meter)}
-                </th>
+                <>
+                  <th key={meter} className={headerClass}>
+                    {formatMeterName(meter)} ({unit})
+                  </th>
+                  <th key={`${meter}-segs`} className={`${headerClass} seg-col`}>
+                    Segs
+                  </th>
+                </>
               ))}
-
-              <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider border-l border-gray-200">
-                Total
-              </th>
-            </tr>
-
-            {/* Sub-header for Consumption/Segments */}
-            <tr className="bg-gray-50">
-              <th></th>
-              {meterList.map((meter) => (
-                <th
-                  key={`${meter}-sub`}
-                  colSpan={2}
-                  className="border-l border-gray-200"
-                >
-                  <div className="grid grid-cols-2">
-                    <span className="px-2 py-1 text-xs text-gray-500 text-center">
-                      {unit}
-                    </span>
-                    <span className="seg-col px-2 py-1 text-xs text-gray-500 text-center bg-gray-100">
-                      Segs
-                    </span>
-                  </div>
-                </th>
-              ))}
-              <th className="border-l border-gray-200"></th>
+              
+              <th className={`${headerClass} text-right`}>Total</th>
             </tr>
           </thead>
 
@@ -133,37 +112,31 @@ function CalcTableSection({ title, icon, unit, data }: TableSectionProps) {
               );
 
               return (
-                <tr key={period.period} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
+                <tr key={period.period} className="hover:bg-gray-50 transition-colors">
+                  <td className={`${cellClass} text-gray-900 whitespace-nowrap`}>
                     {period.period}
                   </td>
 
-                  {/* Render cells for each meter */}
+                  {/* Add consumption + segments cells for each meter */}
                   {meterList.map((meter) => {
                     const meterData = meterMap[meter];
                     return (
-                      <td
-                        key={`${period.period}-${meter}`}
-                        colSpan={2}
-                        className="border-l border-gray-200"
-                      >
-                        <div className="grid grid-cols-2">
-                          <span className="px-2 py-3 text-sm text-gray-900 text-center">
-                            {meterData && meterData.consumption !== null
-                              ? meterData.consumption.toFixed(2)
-                              : '-'}
-                          </span>
-                          <span className="seg-col px-2 py-3 text-sm text-gray-600 text-center bg-gray-50">
-                            {meterData ? meterData.segments : '-'}
-                          </span>
-                        </div>
-                      </td>
+                      <>
+                        <td className={`${cellClass} text-gray-900 text-center`}>
+                          {meterData && meterData.consumption !== null
+                            ? `${meterData.consumption.toFixed(2)} ${unit}`
+                            : '-'}
+                        </td>
+                        <td className={`${cellClass} text-gray-600 text-center seg-col`}>
+                          {meterData ? meterData.segments : '-'}
+                        </td>
+                      </>
                     );
                   })}
 
                   {/* Total column */}
-                  <td className="px-4 py-3 text-sm font-semibold text-gray-900 text-right border-l border-gray-200">
-                    {periodTotal.toFixed(2)} {unit}
+                  <td className={`${cellClass} text-gray-900 text-right font-semibold`}>
+                    <strong>{periodTotal.toFixed(2)} {unit}</strong>
                   </td>
                 </tr>
               );
