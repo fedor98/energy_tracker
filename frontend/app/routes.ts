@@ -12,4 +12,5 @@ export default [
   index("routes/dashboard.tsx"),
   route("setup", "routes/setup.tsx"),
   route("add", "routes/add.tsx"),
+  route("reset", "routes/reset.tsx"),
 ] satisfies RouteConfig;

@@ -472,7 +472,7 @@ export default function Dashboard() {
             Add Reading
           </button>
           <button
-            onClick={() => {/* TODO: Implement meter reset functionality */}}
+            onClick={() => navigate('/reset')}
             className="inline-flex items-center gap-2 px-3 py-1.5 bg-orange-100 hover:bg-orange-200 text-orange-700 font-medium text-sm rounded-full transition-colors"
           >
             <RotateCcw className="w-4 h-4" />

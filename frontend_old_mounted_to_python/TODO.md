@@ -73,6 +73,20 @@
   - [x] Water: Emojis (🔴/🔵) statt Text für Warm/Kalt
 
 ### Phase 3: Additional Routes
+- [x] **Reset Meter** (`/reset`)
+  - [x] Route registriert in routes.ts
+  - [x] Accordion-Layout (einheitlich mit Setup/Add)
+  - [x] Date Picker für Reset-Datum
+  - [x] Electricity-Section: Last Reading + Reset Value (default 0)
+  - [x] Water-Section: Last Reading + Reset Value pro Zähler (warm/kalt)
+  - [x] Gas-Section: Last Reading + Reset Value
+  - [x] Badge zeigt Anzahl konfigurierter Resets
+  - [x] API-Integration: POST /api/readings/reset
+  - [x] Validierung: Mindestens ein Reset erforderlich
+  - [x] Orange Save-Button (unterscheidet sich von Add Reading)
+  - [x] Refactoring: Nutzt jetzt MeterForm-Komponenten (reset mode)
+  - [x] Einheitliches Design: Graue Boxen + Zaehlernummer-Badges
+  - [x] Water: Emojis (🔴/🔵) statt Text für Warm/Kalt
 - [ ] **Edit Reading** (`/edit/:period`)
   - [ ] Bestehende Readings laden
   - [ ] Bearbeiten & Speichern
@@ -88,7 +102,7 @@
   - [x] Setup redirectet zu / wenn Config existiert
 - [x] Dashboard Action Buttons
   - [x] "Add Reading" Button (grün, pill-shaped)
-  - [x] "Reset Meter" Button (orange, pill-shaped, Dummy)
+  - [x] "Reset Meter" Button (orange, pill-shaped) → Navigation zu /reset
   - [x] Position: Unter der Filter Card
   - [x] Icons via lucide-react
 - [ ] Responsive Design (final check)
@@ -101,6 +115,30 @@
   - [x] Setup-Komponenten erweitert (Dual-Mode: setup/reading)
   - [x] Umbenennung: [Type]Setup → [Type]MeterForm
   - [x] Gelöscht: StepIndicator.tsx, ReadingForm.tsx
+
+## Backend-Änderungen (Reset-Feature)
+
+### API-Endpunkte
+- **POST `/api/readings/reset`** - Meter-Resets erstellen
+  - Request: `MeterResetsInput` mit Datum und Resets für Electricity/Water/Gas
+  - Response: `ResetResult` mit Status und Anzahl erstellter Einträge
+  - Erstellt pro Reset 2 Einträge: (1) Last Reading, (2) Reset Value (1 Min. zeitversetzt)
+
+### Datenbank-Schema
+- **TEMPORÄRE ÄNDERUNG** (muss später entfernt werden!):
+  - `is_reset` BOOLEAN-Spalte zu allen readings-Tabellen hinzugefügt
+  - Standardwert: 0 (false)
+  - Reset-Einträge: is_reset = 1
+
+### Modelle (backend/models.py)
+- `ElectricityResetInput` - Reset für Stromzähler
+- `WaterResetInput` - Reset für Wasserzähler (inkl. warm/kalt)
+- `GasResetInput` - Reset für Gaszähler
+- `MeterResetsInput` - Container für alle Resets
+- `ResetResult` - API-Response
+
+### Frontend-API (frontend/app/lib/api.ts)
+- `saveResets(resets: MeterResetsInput)` - POST Request zum Backend
 
 ## Legacy-Referenzdateien
 

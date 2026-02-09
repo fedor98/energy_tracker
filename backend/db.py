@@ -2,7 +2,7 @@ import sqlite3
 import json
 import os
 from typing import List, Optional, Dict, Any
-from models import AppConfig, ElectricityReadingInput, WaterReadingInput, GasReadingInput
+from models import AppConfig, ElectricityReadingInput, WaterReadingInput, GasReadingInput, MeterResetsInput
 
 DB_PATH = "/app/data/energy.sqlite"
 
@@ -34,6 +34,7 @@ def init_db():
             meter_id TEXT NOT NULL,
             value REAL NOT NULL,
             comment TEXT,
+            is_reset BOOLEAN NOT NULL DEFAULT 0,
             UNIQUE(date, meter_name, meter_id)
         )
     ''')
@@ -47,6 +48,7 @@ def init_db():
             value REAL NOT NULL,
             is_warm_water BOOLEAN NOT NULL DEFAULT 0,
             comment TEXT,
+            is_reset BOOLEAN NOT NULL DEFAULT 0,
             UNIQUE(date, room, is_warm_water, meter_id)
         )
     ''')
@@ -59,6 +61,7 @@ def init_db():
             meter_id TEXT NOT NULL,
             value REAL NOT NULL,
             comment TEXT,
+            is_reset BOOLEAN NOT NULL DEFAULT 0,
             UNIQUE(date, room, meter_id)
         )
     ''')
@@ -1115,6 +1118,165 @@ def reorganize_tables():
 
         conn.commit()
         return {"status": "success", "message": "Tables reorganized successfully", "backup_created": backup_path}
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+
+def save_meter_resets(resets: MeterResetsInput) -> Dict[str, Any]:
+    """
+    Save meter resets by creating two entries for each reset:
+    1. The last reading before reset
+    2. The reset value (new meter starting value)
+    
+    A 1-minute time difference ensures proper ordering.
+    Returns status and count of created readings.
+    """
+    from datetime import datetime, timedelta
+    
+    conn = get_db_connection()
+    c = conn.cursor()
+    created_count = 0
+    
+    try:
+        base_date = datetime.strptime(resets.date, '%Y-%m-%d')
+        
+        # Process electricity resets
+        for reset in resets.electricity:
+            # Entry 1: Last reading at base time
+            c.execute('''
+                INSERT INTO readings_electricity (date, meter_name, meter_id, value, comment, is_reset)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(date, meter_name, meter_id) DO UPDATE SET
+                    value = excluded.value,
+                    comment = excluded.comment,
+                    is_reset = excluded.is_reset
+            ''', (
+                base_date.strftime('%Y-%m-%d %H:%M:%S'),
+                reset.meter_name,
+                reset.meter_id,
+                reset.last_reading,
+                'Pre-reset reading (last value before meter replacement)',
+                0
+            ))
+            created_count += 1
+            
+            # Entry 2: Reset value at base time + 1 minute
+            reset_time = base_date + timedelta(minutes=1)
+            c.execute('''
+                INSERT INTO readings_electricity (date, meter_name, meter_id, value, comment, is_reset)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(date, meter_name, meter_id) DO UPDATE SET
+                    value = excluded.value,
+                    comment = excluded.comment,
+                    is_reset = excluded.is_reset
+            ''', (
+                reset_time.strftime('%Y-%m-%d %H:%M:%S'),
+                reset.meter_name,
+                reset.meter_id,
+                reset.reset_value,
+                'Reset reading (new meter starting value)',
+                1
+            ))
+            created_count += 1
+            
+            # Recalculate consumption for this meter
+            _calculate_electricity_consumption(conn, reset.meter_name, base_date.strftime('%Y-%m-%d'))
+        
+        # Process water resets
+        for reset in resets.water:
+            # Entry 1: Last reading at base time
+            c.execute('''
+                INSERT INTO readings_water (date, room, meter_id, value, is_warm_water, comment, is_reset)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(date, room, is_warm_water, meter_id) DO UPDATE SET
+                    value = excluded.value,
+                    comment = excluded.comment,
+                    is_reset = excluded.is_reset
+            ''', (
+                base_date.strftime('%Y-%m-%d %H:%M:%S'),
+                reset.room,
+                reset.meter_id,
+                reset.last_reading,
+                reset.is_warm_water,
+                'Pre-reset reading (last value before meter replacement)',
+                0
+            ))
+            created_count += 1
+            
+            # Entry 2: Reset value at base time + 1 minute
+            reset_time = base_date + timedelta(minutes=1)
+            c.execute('''
+                INSERT INTO readings_water (date, room, meter_id, value, is_warm_water, comment, is_reset)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(date, room, is_warm_water, meter_id) DO UPDATE SET
+                    value = excluded.value,
+                    comment = excluded.comment,
+                    is_reset = excluded.is_reset
+            ''', (
+                reset_time.strftime('%Y-%m-%d %H:%M:%S'),
+                reset.room,
+                reset.meter_id,
+                reset.reset_value,
+                reset.is_warm_water,
+                'Reset reading (new meter starting value)',
+                1
+            ))
+            created_count += 1
+            
+            # Recalculate consumption for this meter
+            _calculate_water_consumption(conn, reset.room, base_date.strftime('%Y-%m-%d'), reset.is_warm_water)
+        
+        # Process gas resets
+        for reset in resets.gas:
+            # Entry 1: Last reading at base time
+            c.execute('''
+                INSERT INTO readings_gas (date, room, meter_id, value, comment, is_reset)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(date, room, meter_id) DO UPDATE SET
+                    value = excluded.value,
+                    comment = excluded.comment,
+                    is_reset = excluded.is_reset
+            ''', (
+                base_date.strftime('%Y-%m-%d %H:%M:%S'),
+                reset.room,
+                reset.meter_id,
+                reset.last_reading,
+                'Pre-reset reading (last value before meter replacement)',
+                0
+            ))
+            created_count += 1
+            
+            # Entry 2: Reset value at base time + 1 minute
+            reset_time = base_date + timedelta(minutes=1)
+            c.execute('''
+                INSERT INTO readings_gas (date, room, meter_id, value, comment, is_reset)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(date, room, meter_id) DO UPDATE SET
+                    value = excluded.value,
+                    comment = excluded.comment,
+                    is_reset = excluded.is_reset
+            ''', (
+                reset_time.strftime('%Y-%m-%d %H:%M:%S'),
+                reset.room,
+                reset.meter_id,
+                reset.reset_value,
+                'Reset reading (new meter starting value)',
+                1
+            ))
+            created_count += 1
+            
+            # Recalculate consumption for this meter
+            _calculate_gas_consumption(conn, reset.room, base_date.strftime('%Y-%m-%d'))
+        
+        conn.commit()
+        return {
+            "status": "success",
+            "message": f"Successfully created {created_count} reset readings",
+            "created_readings": created_count
+        }
     except Exception as e:
         conn.rollback()
         raise e

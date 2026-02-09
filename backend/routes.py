@@ -9,7 +9,9 @@ from models import (
     ElectricityReading,
     WaterReading,
     GasReading,
-    MonthlyReadings
+    MonthlyReadings,
+    MeterResetsInput,
+    ResetResult
 )
 from db import (
     get_config, 
@@ -32,7 +34,8 @@ from db import (
     delete_water_reading,
     delete_gas_reading,
     get_monthly_readings,
-    get_calculation_details_by_type
+    get_calculation_details_by_type,
+    save_meter_resets
 )
 from migration import migrate_legacy_data, check_migration_needed, get_migration_status
 
@@ -370,3 +373,22 @@ def get_water_calculations():
 def get_gas_calculations():
     """Get gas consumption calculations grouped by period."""
     return get_calculation_details_by_type('gas')
+
+# Reset Endpoints
+@router.post("/readings/reset", response_model=ResetResult)
+def create_meter_resets(resets: MeterResetsInput):
+    """
+    Create meter reset entries.
+    
+    For each reset provided, creates two entries:
+    1. The last reading before the meter replacement
+    2. The reset value (starting value of the new meter)
+    
+    Only meters explicitly included in the request are processed.
+    Others remain unchanged.
+    """
+    try:
+        result = save_meter_resets(resets)
+        return ResetResult(**result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save resets: {str(e)}")

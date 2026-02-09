@@ -378,6 +378,57 @@
 
 ---
 
+## 2026-02-09 (Reset Route Refactoring + MeterForm Components)
+
+### Reset Route - Component Integration
+**Status:** ✅ Abgeschlossen
+
+**Aktivitäten:**
+- MeterForm Komponenten erweitert um "reset" mode:
+  - Neuer mode='reset' mit 2 Input-Feldern pro Meter (last_reading + reset_value)
+  - Neue Props: `resets` (Record<string, ResetData>) und `onResetChange`
+  - Einheitliches Design: Graue Boxen (bg-gray-50 rounded-lg p-4) in allen Modi
+  - Zaehlernummer-Badge oben rechts in jedem Meter-Container
+  - ElectricityMeterForm: Reset-Mode mit kWh-Einheiten
+  - WaterMeterForm: Reset-Mode mit m³-Einheiten + Warm/Kalt Emojis (🔴/🔵)
+  - GasMeterForm: Reset-Mode mit m³-Einheiten
+
+- Reset Route refactored (`frontend/app/routes/reset.tsx`):
+  - Inline JSX durch MeterForm-Komponenten ersetzt
+  - Nutzt ElectricityMeterForm, WaterMeterForm, GasMeterForm im reset mode
+  - Code-Reduktion: ~450 Zeilen → ~250 Zeilen
+  - Einheitliches Verhalten mit /add Route
+  - Water-Section: Emojis (🔴/🔵) statt Text-Badges für Warm/Kalt
+
+- Design-Konsistenz:
+  - Alle MeterForm-Komponenten zeigen jetzt graue Boxen und Zaehlernummern
+  - /add Route profitiert automatisch von den visuellen Verbesserungen
+  - /reset Route hat jetzt identisches Design wie /add
+
+**Entscheidungen:**
+- Komponenten-Erweiterung statt Duplizierung (DRY-Prinzip)
+- Reset mode als dritter Mode neben setup und reading
+- Einheitliches Design-Pattern für alle Meter-Formulare
+- Emojis statt Text-Badges für bessere visuelle Erkennbarkeit
+
+**Geänderte Dateien:**
+- `frontend/app/components/ElectricityMeterForm.tsx` (+ reset mode, neue Props)
+- `frontend/app/components/WaterMeterForm.tsx` (+ reset mode, neue Props)
+- `frontend/app/components/GasMeterForm.tsx` (+ reset mode, neue Props)
+- `frontend/app/routes/reset.tsx` (refactored - nutzt jetzt MeterForm-Komponenten)
+- `frontend_old_mounted_to_python/TODO.md` (Tasks aktualisiert)
+- `frontend_old_mounted_to_python/WORKLOG.md` (Dokumentation)
+
+**TypeScript:**
+- Alle Änderungen type-sicher implementiert
+- `npm run typecheck` erfolgreich bestanden ✅
+
+**Nächste Schritte:**
+- Edit Reading Route (`/edit/:period`)
+- Settings Route mit Reset-Funktion
+
+---
+
 ## Format für neue Einträge
 
 ```markdown

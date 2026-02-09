@@ -129,3 +129,39 @@ class ConsumptionCalcItem(BaseModel):
     consumption_value: Optional[float]
     calculation_details: Optional[CalculationDetails] = None
     calculated_at: str
+
+
+# Reset Models
+class ElectricityResetInput(BaseModel):
+    meter_id: str
+    meter_name: str
+    last_reading: float
+    reset_value: float = 0.0
+
+
+class WaterResetInput(BaseModel):
+    meter_id: str
+    room: str
+    is_warm_water: bool = False
+    last_reading: float
+    reset_value: float = 0.0
+
+
+class GasResetInput(BaseModel):
+    meter_id: str
+    room: str
+    last_reading: float
+    reset_value: float = 0.0
+
+
+class MeterResetsInput(BaseModel):
+    date: str  # YYYY-MM-DD
+    electricity: List[ElectricityResetInput] = []
+    water: List[WaterResetInput] = []
+    gas: List[GasResetInput] = []
+
+
+class ResetResult(BaseModel):
+    status: str
+    message: str
+    created_readings: int

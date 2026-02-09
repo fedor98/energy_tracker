@@ -17,22 +17,31 @@ import React, { useState } from 'react';
 import { Toggle } from './Toggle';
 import type { WaterMeterConfig } from '../lib/api';
 
+interface ResetData {
+  last_reading: string;
+  reset_value: string;
+}
+
 interface WaterMeterFormProps {
   meters: WaterMeterConfig[];
   onChange: (meters: WaterMeterConfig[]) => void;
   useCustomMeterIds: boolean;
-  mode?: 'setup' | 'reading';
+  mode?: 'setup' | 'reading' | 'reset';
   readings?: Record<string, string>; // meter_id -> value
   onReadingChange?: (meterId: string, value: string) => void;
+  resets?: Record<string, ResetData>; // meter_id -> { last_reading, reset_value }
+  onResetChange?: (meterId: string, field: 'last_reading' | 'reset_value', value: string) => void;
 }
 
-export function WaterMeterForm({ 
-  meters, 
-  onChange, 
+export function WaterMeterForm({
+  meters,
+  onChange,
   useCustomMeterIds,
   mode = 'setup',
   readings = {},
-  onReadingChange
+  onReadingChange,
+  resets = {},
+  onResetChange
 }: WaterMeterFormProps) {
   const [room, setRoom] = useState('');
   const [isWarmWater, setIsWarmWater] = useState(false);
@@ -72,20 +81,85 @@ export function WaterMeterForm({
     }
   }
 
+  // Reset Mode: Display input fields for meter resets (2 fields per meter)
+  if (mode === 'reset') {
+    return (
+      <div className="space-y-4">
+        {meters.length > 0 ? (
+          meters.map((meter) => (
+            <div key={meter.meter_id} className="p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-medium text-gray-700">
+                  {meter.room}{' '}
+                  <span className={meter.is_warm_water ? 'text-red-500' : 'text-blue-500'}>
+                    {meter.is_warm_water ? '🔴' : '🔵'}
+                  </span>{' '}
+                  <span className="text-gray-500 font-normal">(m³)</span>
+                </span>
+                <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">
+                  {meter.meter_id}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    Last Reading (m³)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.001"
+                    min="0"
+                    placeholder="e.g. 1250.5"
+                    value={resets[meter.meter_id]?.last_reading || ''}
+                    onChange={(e) => onResetChange?.(meter.meter_id, 'last_reading', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">
+                    Reset Value (m³)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.001"
+                    min="0"
+                    placeholder="0"
+                    value={resets[meter.meter_id]?.reset_value || ''}
+                    onChange={(e) => onResetChange?.(meter.meter_id, 'reset_value', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  />
+                </div>
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="text-sm text-gray-500 text-center py-4">
+            No water meters configured. Configure meters in Settings.
+          </p>
+        )}
+      </div>
+    );
+  }
+
   // Reading Mode: Display input fields for existing meters
   if (mode === 'reading') {
     return (
       <div className="space-y-4">
         {meters.length > 0 ? (
           meters.map((meter) => (
-            <div key={meter.meter_id} className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">
-                {meter.room}{' '}
-                <span className={meter.is_warm_water ? 'text-red-500' : 'text-blue-500'}>
-                  {meter.is_warm_water ? '🔴' : '🔵'}
-                </span>{' '}
-                <span className="text-gray-500 font-normal">(m³)</span>
-              </label>
+            <div key={meter.meter_id} className="p-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center justify-between mb-3">
+                <span className="font-medium text-gray-700">
+                  {meter.room}{' '}
+                  <span className={meter.is_warm_water ? 'text-red-500' : 'text-blue-500'}>
+                    {meter.is_warm_water ? '🔴' : '🔵'}
+                  </span>{' '}
+                  <span className="text-gray-500 font-normal">(m³)</span>
+                </span>
+                <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded">
+                  {meter.meter_id}
+                </span>
+              </div>
               <input
                 type="number"
                 step="0.001"

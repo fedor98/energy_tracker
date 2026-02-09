@@ -40,7 +40,7 @@ energy_consumption/
 
 ### Phase 2: Add Reading Route ✅ (2026-02-09) - REDESIGNED
 
-Die `/add` Route wurde erfolgreich von Vanilla JS zu React migriert und anschließend redesignt:
+Die `/add` Route wurde erfolgreich von Vanilla JS zu React migriert und anschließend redesigned:
 
 **Ursprüngliche Migration:**
 - **Legacy**: `js/views/add_reading.js` (135 Zeilen)
@@ -62,12 +62,39 @@ Die `/add` Route wurde erfolgreich von Vanilla JS zu React migriert und anschlie
 - Validierung: Mindestens ein Reading erforderlich
 - Atomic save via Bulk API
 - Gelöscht: `StepIndicator.tsx`, `ReadingForm.tsx`
+- **Neu**: Graue Boxen (bg-gray-50) und Zaehlernummer-Badges für jeden Meter
 
 #### Dashboard-Updates
 - Neue Action-Buttons: "Add Reading" (+ Icon) und "Reset Meter" (↻ Icon)
 - Responsive Layout unter der Filter Card
 - Pill-shaped Design mit dezenten Farben
 - Icons via `lucide-react` Library
+
+### Phase 3: Reset Meter Route ✅ (2026-02-09) - COMPONENT REFACTORING
+
+Die `/reset` Route wurde implementiert und anschließend refactored:
+
+**Initial-Implementation:**
+- Accordion-Layout (einheitlich mit Setup/Add)
+- Inline JSX für alle drei Meter-Typen
+- 2 Input-Felder pro Meter: Last Reading + Reset Value
+- Orange Save-Button (Unterscheidung von Add Reading)
+
+**Component Refactoring:**
+- MeterForm-Komponenten um 'reset' mode erweitert
+- Inline JSX durch wiederverwendbare Komponenten ersetzt
+- Code-Reduktion: ~450 Zeilen → ~250 Zeilen
+
+#### Drei-Mode-System
+- `mode='setup'` - Konfiguration von Metern (Hinzufügen/Entfernen)
+- `mode='reading'` - Eingabe von Zählerständen (1 Feld pro Meter)
+- `mode='reset'` - Meter-Resets (2 Felder: Last Reading + Reset Value)
+
+#### Design-Verbesserungen
+- Graue Boxen (bg-gray-50 rounded-lg p-4) für jeden Meter
+- Zaehlernummer-Badge oben rechts (bg-gray-200)
+- Water: Emojis (🔴/🔵) statt Text für Warm/Kalt
+- Einheitliches Design zwischen /add und /reset
 
 ### TODOs
 - [ ] Reset Meter Button: Funktionalität implementieren
