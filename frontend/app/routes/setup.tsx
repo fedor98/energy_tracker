@@ -137,7 +137,7 @@ export default function Setup() {
     return (
       <div className="min-h-screen bg-gray-50 py-8 px-4">
         <div className="max-w-2xl mx-auto">
-          <div className="bg-white rounded-lg shadow-md p-8">
+          <div className="bg-white rounded-lg shadow-md p-4 sm:p-8">
             <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">
               Welcome to Energy Tracker
             </h1>
@@ -194,7 +194,7 @@ export default function Setup() {
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-2xl mx-auto">
-        <div className="bg-white rounded-lg shadow-md p-8">
+        <div className="bg-white rounded-lg shadow-md p-4 sm:p-8">
           <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">
             Setup Your Meters
           </h1>
@@ -259,6 +259,13 @@ export default function Setup() {
 
           {/* Footer Actions */}
           <div className="mt-8 pt-6 border-t border-gray-200">
+            {/* Counter - Full width on mobile, inline on desktop */}
+            <div className="text-center sm:text-right mb-4 sm:mb-0 sm:hidden">
+              <span className="text-sm text-gray-500">
+                {totalMeters} meter{totalMeters !== 1 ? 's' : ''} configured
+              </span>
+            </div>
+            
             <div className="flex items-center justify-between">
               <button
                 onClick={() => setShowIntro(true)}
@@ -268,7 +275,7 @@ export default function Setup() {
               </button>
               
               <div className="flex items-center gap-4">
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-gray-500 hidden sm:inline">
                   {totalMeters} meter{totalMeters !== 1 ? 's' : ''} configured
                 </span>
                 <button

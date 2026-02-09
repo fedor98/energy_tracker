@@ -179,7 +179,7 @@ export default function AddReading() {
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
       <div className="max-w-2xl mx-auto">
-        <div className="bg-white rounded-lg shadow-md p-8">
+        <div className="bg-white rounded-lg shadow-md p-4 sm:p-8">
           <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">
             Add Readings
           </h1>
@@ -275,6 +275,13 @@ export default function AddReading() {
 
           {/* Footer Actions */}
           <div className="mt-8 pt-6 border-t border-gray-200">
+            {/* Counter - Full width on mobile, inline on desktop */}
+            <div className="text-center sm:text-right mb-4 sm:mb-0 sm:hidden">
+              <span className="text-sm text-gray-500">
+                {countReadings('electricity') + countReadings('water') + countReadings('gas')} reading(s) entered
+              </span>
+            </div>
+            
             <div className="flex items-center justify-between">
               <button
                 onClick={() => navigate('/')}
@@ -284,7 +291,7 @@ export default function AddReading() {
               </button>
               
               <div className="flex items-center gap-4">
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-gray-500 hidden sm:inline">
                   {countReadings('electricity') + countReadings('water') + countReadings('gas')} reading(s) entered
                 </span>
                 <button
