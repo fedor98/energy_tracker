@@ -72,14 +72,14 @@ export function ConsumptionChart({
     const waterColdByPeriod: Record<string, number> = {};
 
     waterData.forEach((row) => {
-      if (row.period && row.consumption !== undefined) {
-        waterTotalByPeriod[row.period] = (waterTotalByPeriod[row.period] || 0) + row.consumption;
+      if (row.period && row.total_water_consumption !== undefined) {
+        waterTotalByPeriod[row.period] = (waterTotalByPeriod[row.period] || 0) + row.total_water_consumption;
         allPeriods.add(row.period);
 
         if (row.is_warm_water) {
-          waterWarmByPeriod[row.period] = (waterWarmByPeriod[row.period] || 0) + row.consumption;
+          waterWarmByPeriod[row.period] = (waterWarmByPeriod[row.period] || 0) + row.total_water_consumption;
         } else {
-          waterColdByPeriod[row.period] = (waterColdByPeriod[row.period] || 0) + row.consumption;
+          waterColdByPeriod[row.period] = (waterColdByPeriod[row.period] || 0) + row.total_water_consumption;
         }
       }
     });
