@@ -1,13 +1,15 @@
 /**
  * Edit Route
- * 
+ *
  * Allows editing of all meter readings for a specific date.
  * Uses page-layout components for consistent design with Add and Reset routes.
- * 
+ *
  * URL Parameters:
  * - date: The date to edit (YYYY-MM-DD)
- * - period: The period to return to (YYYY-MM)
- * 
+ *
+ * Navigation State:
+ * - returnPeriod: The period to return to (YYYY-MM) when navigating back
+ *
  * Features:
  * - Loads all readings for the specified date
  * - Shows only accordion sections for energy types with data
@@ -16,7 +18,7 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { useSearchParams, useNavigate } from 'react-router';
+import { useSearchParams, useNavigate, useLocation } from 'react-router';
 import { AccordionSection } from '../components/AccordionSection';
 import { ElectricityMeterForm } from '../components/ElectricityMeterForm';
 import { WaterMeterForm } from '../components/WaterMeterForm';
@@ -36,9 +38,10 @@ type OpenSection = 'electricity' | 'water' | 'gas' | null;
 export default function EditRoute() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const date = searchParams.get('date') || '';
-  const period = searchParams.get('period') || '';
+  const returnPeriod = location.state?.returnPeriod;
 
   const [originalDate, setOriginalDate] = useState(date);
   const [newDate, setNewDate] = useState(date);
@@ -256,11 +259,7 @@ export default function EditRoute() {
 
       // Navigate back to dashboard after a short delay
       setTimeout(() => {
-        if (period) {
-          navigate(`/?period=${period}`);
-        } else {
-          navigate('/');
-        }
+        navigate('/', { state: { preselectedPeriod: returnPeriod } });
       }, 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save readings');
@@ -403,11 +402,7 @@ export default function EditRoute() {
 
           <FormFooter
             onCancel={() => {
-              if (period) {
-                navigate(`/?period=${period}`);
-              } else {
-                navigate('/');
-              }
+              navigate('/', { state: { preselectedPeriod: returnPeriod } });
             }}
             onSave={handleSave}
             saveLabel="Save Changes"

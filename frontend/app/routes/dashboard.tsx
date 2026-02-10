@@ -13,7 +13,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useLocation } from 'react-router';
 import { Plus, RotateCcw } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -178,10 +178,22 @@ function DashboardTabs({ activeTab, onChange }: DashboardTabsProps) {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const location = useLocation();
   
   // Filter state for date range selection
   const [startMonth, setStartMonth] = useState<string>('');
   const [endMonth, setEndMonth] = useState<string>('');
+
+  // Read preselected period from navigation state (when returning from edit)
+  useEffect(() => {
+    const preselectedPeriod = location.state?.preselectedPeriod;
+    if (preselectedPeriod) {
+      setStartMonth(preselectedPeriod);
+      setEndMonth(preselectedPeriod);
+      // Clear the state so it doesn't persist on subsequent renders
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, location.pathname, navigate]);
 
   // Refs for date picker interactions
   const startMonthRef = useRef<HTMLInputElement>(null);
@@ -328,7 +340,7 @@ export default function Dashboard() {
    * Handle edit action - navigate to edit route
    */
   const handleEdit = (date: string) => {
-    navigate(`/edit?date=${date}&period=${startMonth || endMonth}`);
+    navigate(`/edit?date=${date}`, { state: { returnPeriod: startMonth || endMonth } });
   };
 
   /**
