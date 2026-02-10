@@ -93,7 +93,7 @@ function renderTableHeader(type: 'electricity' | 'water' | 'gas', showActions?: 
         <th className={baseHeaderClass}>Date</th>
         <th className={baseHeaderClass}>Meter</th>
         <th className={`${baseHeaderClass} text-right`}>Value</th>
-        {showActions && <th className={`${baseHeaderClass} text-center`}>Actions</th>}
+        {showActions && <th className={`${baseHeaderClass} w-8`}></th>}
       </>
     );
   }
@@ -104,7 +104,7 @@ function renderTableHeader(type: 'electricity' | 'water' | 'gas', showActions?: 
       <th className={baseHeaderClass}>Date</th>
       <th className={baseHeaderClass}>Room</th>
       <th className={`${baseHeaderClass} text-right`}>Value</th>
-      {showActions && <th className={`${baseHeaderClass} text-center`}>Actions</th>}
+        {showActions && <th className={`${baseHeaderClass} w-8`}></th>}
     </>
   );
 }
@@ -118,7 +118,6 @@ function renderTableRow(
   row: MeterData,
   type: 'electricity' | 'water' | 'gas',
   isFirstInMonth: boolean,
-  isFirstRowOfDate: boolean,
   showActions?: boolean,
   onEdit?: (date: string) => void,
   onDelete?: (date: string) => void
@@ -184,11 +183,11 @@ function renderTableRow(
       </td>
       {showActions && (
         <td
-          className={`${baseCellClass} text-center ${
+          className={`${baseCellClass} px-1 text-center ${
             isFirstInMonth ? 'border-t-2 border-gray-300' : ''
           }`}
         >
-          {isFirstRowOfDate && onEdit && onDelete && (
+          {onEdit && onDelete && (
             <TableActionsMenu
               date={getDateKey(row.date)}
               onEdit={onEdit}
@@ -228,9 +227,6 @@ export function MeterDataTable({
   const grouped = groupByPeriod(data);
   const sortedPeriods = Object.keys(grouped).sort().reverse(); // Newest first
 
-  // Track which dates we've seen to show actions only once per date
-  const seenDates = new Set<string>();
-
   return (
     <div className="overflow-x-auto">
       <table className="data-table min-w-full">
@@ -245,18 +241,10 @@ export function MeterDataTable({
             const sortedRows = [...periodRows].sort(sortByMeterName);
 
             return sortedRows.map((row, index) => {
-              // Track date changes for actions column
-              const dateKey = row.date.split(' ')[0]; // Remove time part
-              const isFirstRowOfDate = !seenDates.has(dateKey);
-              if (isFirstRowOfDate) {
-                seenDates.add(dateKey);
-              }
-
               return renderTableRow(
                 row,
                 type,
                 index === 0,
-                isFirstRowOfDate,
                 showActions,
                 onEdit,
                 onDelete
