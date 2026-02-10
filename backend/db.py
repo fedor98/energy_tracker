@@ -313,67 +313,8 @@ def _calculate_water_consumption(conn, room: str, date: str, is_warm_water = Non
             VALUES (?, ?, ?, ?, ?, ?)
         ''', (period, entity_type, room, meter_id, consumption, calc_details_json))
     
-    # Calculate total consumption (sum of warm + cold) if both exist
-    if is_warm_water is None:
-        c.execute('''
-            DELETE FROM consumption_calc 
-            WHERE period = ? AND entity_id = ? AND entity_type = 'water_total'
-        ''', (period, room))
-        
-        # Get all water readings for this room/period
-        c.execute('''
-            SELECT date, value, is_warm_water, comment FROM readings_water 
-            WHERE room = ? AND SUBSTR(date, 1, 7) = ?
-            ORDER BY date ASC, is_warm_water
-        ''', (room, period))
-        all_readings = c.fetchall()
-        
-        if all_readings:
-            # Group readings by date and sum warm + cold
-            readings_by_date = {}
-            for r in all_readings:
-                date_key = r['date']
-                if date_key not in readings_by_date:
-                    readings_by_date[date_key] = {'value': 0, 'comment': r['comment'] or ''}
-                readings_by_date[date_key]['value'] += r['value']
-            
-            # Build total readings list
-            total_readings = [
-                {'date': d, 'value': v['value'], 'comment': v['comment']}
-                for d, v in sorted(readings_by_date.items())
-            ]
-            
-            # Get first reading of next period for total
-            c.execute('''
-                SELECT date, value, is_warm_water, comment FROM readings_water 
-                WHERE room = ? AND date >= ?
-                ORDER BY date ASC, is_warm_water
-            ''', (room, f"{period}-32"))
-            next_readings = c.fetchall()
-            
-            if next_readings:
-                # Sum next period readings by date
-                next_by_date = {}
-                for r in next_readings:
-                    date_key = r['date']
-                    if date_key not in next_by_date:
-                        next_by_date[date_key] = 0
-                    next_by_date[date_key] += r['value']
-                
-                # Add first date from next period
-                first_next_date = min(next_by_date.keys())
-                total_readings.append({
-                    'date': first_next_date,
-                    'value': next_by_date[first_next_date],
-                    'comment': ''
-                })
-            
-            if len(total_readings) >= 2:
-                total_consumption, total_details, _ = _calculate_consumption_from_readings(total_readings)
-                c.execute('''
-                    INSERT INTO consumption_calc (period, entity_type, entity_id, consumption_value, calculation_details)
-                    VALUES (?, 'water_total', ?, ?, ?)
-                ''', (period, room, total_consumption, json.dumps(total_details) if total_details else None))
+    # Note: water_total is now calculated dynamically in the API layer
+    # No need to store it in the database anymore
     
     conn.commit()
 
@@ -602,13 +543,29 @@ def delete_electricity_reading(id: int) -> bool:
     conn.commit()
 
     if deleted and reading:
-        # Delete associated consumption calculation
-        period = reading['date'][:7]
+        # Recalculate consumption for this meter
+        _calculate_electricity_consumption(conn, reading['meter_name'], reading['date'])
+        
+        # Also recalculate previous month since the deleted reading
+        # might have been the "next period" data needed for calculation
+        from datetime import datetime
+        current_date = datetime.strptime(reading['date'], '%Y-%m-%d')
+        if current_date.month == 1:
+            prev_year = current_date.year - 1
+            prev_month = 12
+        else:
+            prev_year = current_date.year
+            prev_month = current_date.month - 1
+        prev_period = f"{prev_year:04d}-{prev_month:02d}"
+        
+        # Check if there are readings for the previous month
         c.execute('''
-            DELETE FROM consumption_calc
-            WHERE period = ? AND entity_type = 'electricity' AND entity_id = ? AND meter_id = ?
-        ''', (period, reading['meter_name'], reading['meter_id']))
-        conn.commit()
+            SELECT 1 FROM readings_electricity 
+            WHERE meter_name = ? AND SUBSTR(date, 1, 7) = ?
+            LIMIT 1
+        ''', (reading['meter_name'], prev_period))
+        if c.fetchone():
+            _calculate_electricity_consumption(conn, reading['meter_name'], f"{prev_period}-01")
 
     conn.close()
 
@@ -799,6 +756,27 @@ def delete_water_reading(id: int) -> bool:
     if deleted and reading:
         # Recalculate consumption for this room and type
         _calculate_water_consumption(conn, reading['room'], reading['date'], reading['is_warm_water'])
+        
+        # Also recalculate previous month since the deleted reading
+        # might have been the "next period" data needed for calculation
+        from datetime import datetime
+        current_date = datetime.strptime(reading['date'], '%Y-%m-%d')
+        if current_date.month == 1:
+            prev_year = current_date.year - 1
+            prev_month = 12
+        else:
+            prev_year = current_date.year
+            prev_month = current_date.month - 1
+        prev_period = f"{prev_year:04d}-{prev_month:02d}"
+        
+        # Check if there are readings for the previous month
+        c.execute('''
+            SELECT 1 FROM readings_water 
+            WHERE room = ? AND is_warm_water = ? AND SUBSTR(date, 1, 7) = ?
+            LIMIT 1
+        ''', (reading['room'], reading['is_warm_water'], prev_period))
+        if c.fetchone():
+            _calculate_water_consumption(conn, reading['room'], f"{prev_period}-01", reading['is_warm_water'])
 
     conn.close()
 
@@ -953,13 +931,29 @@ def delete_gas_reading(id: int) -> bool:
     conn.commit()
 
     if deleted and reading:
-        # Delete associated consumption calculation
-        period = reading['date'][:7]
+        # Recalculate consumption for this room
+        _calculate_gas_consumption(conn, reading['room'], reading['date'])
+        
+        # Also recalculate previous month since the deleted reading
+        # might have been the "next period" data needed for calculation
+        from datetime import datetime
+        current_date = datetime.strptime(reading['date'], '%Y-%m-%d')
+        if current_date.month == 1:
+            prev_year = current_date.year - 1
+            prev_month = 12
+        else:
+            prev_year = current_date.year
+            prev_month = current_date.month - 1
+        prev_period = f"{prev_year:04d}-{prev_month:02d}"
+        
+        # Check if there are readings for the previous month
         c.execute('''
-            DELETE FROM consumption_calc
-            WHERE period = ? AND entity_type = 'gas' AND entity_id = ? AND meter_id = ?
-        ''', (period, reading['room'], reading['meter_id']))
-        conn.commit()
+            SELECT 1 FROM readings_gas 
+            WHERE room = ? AND SUBSTR(date, 1, 7) = ?
+            LIMIT 1
+        ''', (reading['room'], prev_period))
+        if c.fetchone():
+            _calculate_gas_consumption(conn, reading['room'], f"{prev_period}-01")
 
     conn.close()
 
@@ -980,7 +974,7 @@ def get_calculation_details_by_type(entity_type: str) -> Dict[str, Any]:
     Get calculation details grouped by period for a specific entity type.
     Returns periods with all meters and their consumption/segment counts.
     
-    entity_type: 'electricity', 'gas', 'water_warm', 'water_cold', or 'water_total'
+    entity_type: 'electricity', 'gas', 'water_warm', or 'water_cold'
     """
     import json
     conn = get_db_connection()
@@ -1744,6 +1738,77 @@ def delete_readings_by_date(date: str, is_reset: Optional[bool] = None) -> Dict[
         for room in gas_rooms:
             try:
                 _calculate_gas_consumption(conn, room['room'], f"{room['period']}-01")
+            except:
+                pass
+        
+        # Also recalculate previous month for all affected meters/rooms
+        # since the deleted reading might have been the "next period" data
+        # needed for the previous month's calculation
+        from datetime import datetime
+        
+        for meter in elec_meters:
+            try:
+                current_date = datetime.strptime(f"{meter['period']}-01", '%Y-%m-%d')
+                if current_date.month == 1:
+                    prev_year = current_date.year - 1
+                    prev_month = 12
+                else:
+                    prev_year = current_date.year
+                    prev_month = current_date.month - 1
+                prev_period = f"{prev_year:04d}-{prev_month:02d}"
+                
+                # Check if there are readings for the previous month
+                c.execute('''
+                    SELECT 1 FROM readings_electricity 
+                    WHERE meter_name = ? AND SUBSTR(date, 1, 7) = ?
+                    LIMIT 1
+                ''', (meter['meter_name'], prev_period))
+                if c.fetchone():
+                    _calculate_electricity_consumption(conn, meter['meter_name'], f"{prev_period}-01")
+            except:
+                pass
+        
+        for room in water_rooms:
+            try:
+                current_date = datetime.strptime(f"{room['period']}-01", '%Y-%m-%d')
+                if current_date.month == 1:
+                    prev_year = current_date.year - 1
+                    prev_month = 12
+                else:
+                    prev_year = current_date.year
+                    prev_month = current_date.month - 1
+                prev_period = f"{prev_year:04d}-{prev_month:02d}"
+                
+                # Check if there are readings for the previous month
+                c.execute('''
+                    SELECT 1 FROM readings_water 
+                    WHERE room = ? AND SUBSTR(date, 1, 7) = ?
+                    LIMIT 1
+                ''', (room['room'], prev_period))
+                if c.fetchone():
+                    _calculate_water_consumption(conn, room['room'], f"{prev_period}-01")
+            except:
+                pass
+        
+        for room in gas_rooms:
+            try:
+                current_date = datetime.strptime(f"{room['period']}-01", '%Y-%m-%d')
+                if current_date.month == 1:
+                    prev_year = current_date.year - 1
+                    prev_month = 12
+                else:
+                    prev_year = current_date.year
+                    prev_month = current_date.month - 1
+                prev_period = f"{prev_year:04d}-{prev_month:02d}"
+                
+                # Check if there are readings for the previous month
+                c.execute('''
+                    SELECT 1 FROM readings_gas 
+                    WHERE room = ? AND SUBSTR(date, 1, 7) = ?
+                    LIMIT 1
+                ''', (room['room'], prev_period))
+                if c.fetchone():
+                    _calculate_gas_consumption(conn, room['room'], f"{prev_period}-01")
             except:
                 pass
         

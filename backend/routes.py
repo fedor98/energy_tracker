@@ -319,18 +319,19 @@ def get_electricity_calculations():
 
 @router.get("/calculations/water")
 def get_water_calculations():
-    """Get water consumption calculations grouped by period."""
+    """Get water consumption calculations grouped by period.
+    
+    Returns only warm and cold water consumption per room.
+    Total consumption is calculated in the chart view.
+    """
     warm_data = get_calculation_details_by_type('water_warm')
     cold_data = get_calculation_details_by_type('water_cold')
-    total_data = get_calculation_details_by_type('water_total')
     
-    # Combine all water types
+    # Combine all periods from warm and cold data
     all_periods = set()
     for p in warm_data['periods']:
         all_periods.add(p['period'])
     for p in cold_data['periods']:
-        all_periods.add(p['period'])
-    for p in total_data['periods']:
         all_periods.add(p['period'])
     
     # Build result with all meters per period
@@ -354,16 +355,6 @@ def get_water_calculations():
                 for m in p['meters']:
                     meters.append({
                         'entity_id': f"{m['entity_id']} (Cold)",
-                        'consumption': m['consumption'],
-                        'segments': m['segments']
-                    })
-        
-        # Add total consumption (as separate info)
-        for p in total_data['periods']:
-            if p['period'] == period:
-                for m in p['meters']:
-                    meters.append({
-                        'entity_id': f"{m['entity_id']} (Total)",
                         'consumption': m['consumption'],
                         'segments': m['segments']
                     })
