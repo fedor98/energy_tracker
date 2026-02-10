@@ -124,6 +124,9 @@ function renderTableRow(
 ) {
   const baseCellClass = 'px-4 py-3 text-sm';
 
+  // Check if this is a reset entry
+  const isReset = 'is_reset' in row && row.is_reset;
+
   // Format the value with 2 decimal places and appropriate unit
   const formatValue = (value: number | null | undefined): string => {
     if (value === null || value === undefined) return '-';
@@ -132,6 +135,15 @@ function renderTableRow(
 
   // Get unit based on type
   const unit = type === 'electricity' ? 'kWh' : 'm³';
+
+  // Format date: remove time for reset entries
+  const formatDate = (dateStr: string): string => {
+    if (!dateStr) return '-';
+    if (isReset) {
+      return dateStr.split(' ')[0]; // Remove time part for resets
+    }
+    return dateStr;
+  };
 
   // Render meter/room name with type-specific formatting
   const renderMeterName = () => {
@@ -165,7 +177,7 @@ function renderTableRow(
           isFirstInMonth ? 'border-t-2 border-gray-300' : ''
         }`}
       >
-        {row.date || '-'}
+        {formatDate(row.date || '')}{isReset ? <span className="text-red-500"> *</span> : ''}
       </td>
       <td
         className={`${baseCellClass} text-gray-700 ${
@@ -179,7 +191,7 @@ function renderTableRow(
           isFirstInMonth ? 'border-t-2 border-gray-300' : ''
         }`}
       >
-        {formatValue(row.value)} {unit}
+        {formatValue(row.value)} {unit}{isReset ? <span className="text-red-500"> *</span> : ''}
       </td>
       {showActions && (
         <td

@@ -67,6 +67,7 @@ class ElectricityReading(ElectricityReadingInput):
     period: str  # YYYY-MM, derived from date
     consumption: Optional[float] = None
     calculation_details: Optional[str] = None
+    is_reset: bool = False
 
 class WaterReadingInput(BaseModel):
     date: str  # YYYY-MM-DD
@@ -83,6 +84,7 @@ class WaterReading(WaterReadingInput):
     total_water_consumption: Optional[float] = None
     warm_water_consumption: Optional[float] = None
     cold_water_consumption: Optional[float] = None
+    is_reset: bool = False
 
 class GasReadingInput(BaseModel):
     date: str  # YYYY-MM-DD
@@ -96,6 +98,7 @@ class GasReading(GasReadingInput):
     period: str  # YYYY-MM, derived from date
     consumption: Optional[float] = None
     calculation_details: Optional[str] = None
+    is_reset: bool = False
 
 class MeterSummary(BaseModel):
     type: str

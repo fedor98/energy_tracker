@@ -1159,7 +1159,7 @@ def save_meter_resets(resets: MeterResetsInput) -> Dict[str, Any]:
                 reset.meter_id,
                 reset.last_reading,
                 'Pre-reset reading (last value before meter replacement)',
-                0
+                1
             ))
             created_count += 1
             
@@ -1202,7 +1202,7 @@ def save_meter_resets(resets: MeterResetsInput) -> Dict[str, Any]:
                 reset.last_reading,
                 reset.is_warm_water,
                 'Pre-reset reading (last value before meter replacement)',
-                0
+                1
             ))
             created_count += 1
             
@@ -1245,7 +1245,7 @@ def save_meter_resets(resets: MeterResetsInput) -> Dict[str, Any]:
                 reset.meter_id,
                 reset.last_reading,
                 'Pre-reset reading (last value before meter replacement)',
-                0
+                1
             ))
             created_count += 1
             
