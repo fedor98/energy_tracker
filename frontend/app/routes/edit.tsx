@@ -2,7 +2,7 @@
  * Edit Route
  * 
  * Allows editing of all meter readings for a specific date.
- * Uses the same design pattern as Add Reading and Reset routes for consistency.
+ * Uses page-layout components for consistent design with Add and Reset routes.
  * 
  * URL Parameters:
  * - date: The date to edit (YYYY-MM-DD)
@@ -15,12 +15,13 @@
  * - Reset entries are marked with badge
  */
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router';
 import { AccordionSection } from '../components/AccordionSection';
 import { ElectricityMeterForm } from '../components/ElectricityMeterForm';
 import { WaterMeterForm } from '../components/WaterMeterForm';
 import { GasMeterForm } from '../components/GasMeterForm';
+import { PageLayout, DateSection, FormFooter } from '../components/accordion-page-layout';
 import type {
   ReadingsByDateResponse,
   ElectricityReading,
@@ -49,8 +50,6 @@ export default function EditRoute() {
   
   // Accordion state - only one section open at a time
   const [openSection, setOpenSection] = useState<OpenSection>(null);
-  
-  const dateInputRef = useRef<HTMLInputElement>(null);
 
   // Readings state for editing - meter_id -> { value, comment }
   const [editReadings, setEditReadings] = useState<{
@@ -269,100 +268,42 @@ export default function EditRoute() {
     }
   };
 
-  // Loading state
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-gray-600">Loading readings...</span>
-        </div>
-      </div>
-    );
-  }
-
-  // No readings state
-  if (!hasAnyReadings()) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-8 px-4">
-        <div className="max-w-2xl mx-auto">
-          <div className="bg-white rounded-lg shadow-md p-4 sm:p-8">
-            <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">
-              Edit Readings
-            </h1>
-            <p className="text-gray-600 text-center mb-8">
-              No readings found for this date.
-            </p>
-            <div className="text-center">
-              <button
-                onClick={() => navigate('/')}
-                className="text-gray-600 hover:text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                Back to Dashboard
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Helper text for date section
+  const dateHelperText = newDate !== originalDate 
+    ? `Date will be changed from ${originalDate} to ${newDate}`
+    : undefined;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-white rounded-lg shadow-md p-4 sm:p-8">
-          <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">
-            Edit Readings
-          </h1>
-          <p className="text-gray-600 text-center mb-8">
-            Editing readings for {new Date(date).toLocaleDateString('en-US', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            })}
-          </p>
-
-          {/* Error Message */}
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-              {error}
-            </div>
-          )}
-
-          {/* Success Message */}
-          {successMessage && (
-            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
-              {successMessage}
-            </div>
-          )}
-
-          {/* Date Section */}
-          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Date
-            </label>
-            <div className="relative">
-              <input
-                ref={dateInputRef}
-                type="date"
-                value={newDate}
-                onChange={(e) => setNewDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer relative z-20"
-                style={{ WebkitAppearance: 'none' }}
-              />
-              <div
-                className="absolute inset-0 cursor-pointer sm:block hidden"
-                onClick={() => dateInputRef.current?.showPicker?.()}
-                style={{ zIndex: 10 }}
-              />
-            </div>
-            {newDate !== originalDate && (
-              <p className="mt-2 text-sm text-blue-600">
-                Date will be changed from {originalDate} to {newDate}
-              </p>
-            )}
-          </div>
+    <PageLayout
+      title="Edit Readings"
+      description={`Editing readings for ${new Date(date).toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      })}`}
+      loading={loading}
+      loadingText="Loading readings..."
+      error={error}
+      success={successMessage}
+    >
+      {!hasAnyReadings() ? (
+        <div className="text-center py-8">
+          <p className="text-gray-500 text-lg mb-4">No readings found for this date.</p>
+          <button
+            onClick={() => navigate('/')}
+            className="text-gray-600 hover:text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+      ) : (
+        <>
+          <DateSection
+            value={newDate}
+            onChange={setNewDate}
+            helperText={dateHelperText}
+          />
 
           {/* Accordion Sections */}
           <div className="space-y-0">
@@ -460,45 +401,22 @@ export default function EditRoute() {
             )}
           </div>
 
-          {/* Footer Actions */}
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            {/* Counter - Full width on mobile, inline on desktop */}
-            <div className="text-center sm:text-right mb-4 sm:mb-0 sm:hidden">
-              <span className="text-sm text-gray-500">
-                {countReadings('electricity') + countReadings('water') + countReadings('gas')} reading(s)
-              </span>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <button
-                onClick={() => {
-                  if (period) {
-                    navigate(`/?period=${period}`);
-                  } else {
-                    navigate('/');
-                  }
-                }}
-                className="text-gray-600 hover:text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                Cancel
-              </button>
-              
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-gray-500 hidden sm:inline">
-                  {countReadings('electricity') + countReadings('water') + countReadings('gas')} reading(s)
-                </span>
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="py-2 px-6 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                >
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+          <FormFooter
+            onCancel={() => {
+              if (period) {
+                navigate(`/?period=${period}`);
+              } else {
+                navigate('/');
+              }
+            }}
+            onSave={handleSave}
+            saveLabel="Save Changes"
+            counter={countReadings('electricity') + countReadings('water') + countReadings('gas')}
+            counterLabel="reading(s)"
+            saving={saving}
+          />
+        </>
+      )}
+    </PageLayout>
   );
 }

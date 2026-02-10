@@ -2,7 +2,7 @@
  * Reset Meter Route
  * 
  * Form for creating meter reset entries when a meter is replaced.
- * Uses accordion layout matching Setup and Add Reading routes.
+ * Uses accordion layout and page-layout components for consistency.
  * 
  * Flow:
  * 1. Date selection (when the meter was replaced)
@@ -17,12 +17,13 @@
  * - Only submitted meters are processed
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { AccordionSection } from '../components/AccordionSection';
 import { ElectricityMeterForm } from '../components/ElectricityMeterForm';
 import { WaterMeterForm } from '../components/WaterMeterForm';
 import { GasMeterForm } from '../components/GasMeterForm';
+import { PageLayout, DateSection, FormFooter } from '../components/accordion-page-layout';
 import { getConfig, saveResets, type AppConfig, type MeterResetsInput } from '../lib/api';
 
 type OpenSection = 'electricity' | 'water' | 'gas' | null;
@@ -48,7 +49,6 @@ export default function ResetMeter() {
   
   // Date for all resets
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const dateInputRef = useRef<HTMLInputElement>(null);
   
   // Resets state - meter_id -> reset data
   const [resets, setResets] = useState<{
@@ -187,158 +187,86 @@ export default function ResetMeter() {
     }
   }
 
-  // Loading state
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-gray-600">Loading...</span>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-white rounded-lg shadow-md p-4 sm:p-8">
-          <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">
-            Reset Meters
-          </h1>
-          <p className="text-gray-600 text-center mb-2">
-            Record meter replacements and reset values.
-          </p>
-          <p className="text-sm text-gray-500 text-center mb-8">
-            For each replaced meter, enter the last reading from the old meter and the starting value of the new meter.
-          </p>
+    <PageLayout
+      title="Reset Meters"
+      description="Record meter replacements and reset values."
+      loading={loading}
+      loadingText="Loading..."
+      error={error}
+      success={successMessage}
+    >
+      <DateSection
+        label="Replacement Date"
+        value={date}
+        onChange={setDate}
+      />
 
-          {/* Error Message */}
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-              {error}
-            </div>
-          )}
+      {/* Accordion Sections */}
+      <div className="space-y-0">
+        {/* Electricity Section */}
+        <AccordionSection
+          title="Electricity"
+          icon="⚡"
+          isOpen={openSection === 'electricity'}
+          onToggle={() => toggleSection('electricity')}
+          badge={countResets('electricity')}
+        >
+          <ElectricityMeterForm
+            meters={config?.electricity.meters || []}
+            onChange={() => {}}
+            useCustomMeterIds={false}
+            mode="reset"
+            resets={resets.electricity}
+            onResetChange={(meterId, field, value) => updateReset('electricity', meterId, field, value)}
+          />
+        </AccordionSection>
 
-          {/* Success Message */}
-          {successMessage && (
-            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
-              {successMessage}
-            </div>
-          )}
+        {/* Water Section */}
+        <AccordionSection
+          title="Water"
+          icon="💧"
+          isOpen={openSection === 'water'}
+          onToggle={() => toggleSection('water')}
+          badge={countResets('water')}
+        >
+          <WaterMeterForm
+            meters={config?.water.meters || []}
+            onChange={() => {}}
+            useCustomMeterIds={false}
+            mode="reset"
+            resets={resets.water}
+            onResetChange={(meterId, field, value) => updateReset('water', meterId, field, value)}
+          />
+        </AccordionSection>
 
-          {/* Date Section */}
-          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Replacement Date
-            </label>
-            <div className="relative">
-              <input
-                ref={dateInputRef}
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer relative z-20"
-                style={{ WebkitAppearance: 'none' }}
-              />
-              <div
-                className="absolute inset-0 cursor-pointer sm:block hidden"
-                onClick={() => dateInputRef.current?.showPicker?.()}
-                style={{ zIndex: 10 }}
-              />
-            </div>
-          </div>
-
-          {/* Accordion Sections */}
-          <div className="space-y-0">
-            {/* Electricity Section */}
-            <AccordionSection
-              title="Electricity"
-              icon="⚡"
-              isOpen={openSection === 'electricity'}
-              onToggle={() => toggleSection('electricity')}
-              badge={countResets('electricity')}
-            >
-              <ElectricityMeterForm
-                meters={config?.electricity.meters || []}
-                onChange={() => {}}
-                useCustomMeterIds={false}
-                mode="reset"
-                resets={resets.electricity}
-                onResetChange={(meterId, field, value) => updateReset('electricity', meterId, field, value)}
-              />
-            </AccordionSection>
-
-            {/* Water Section */}
-            <AccordionSection
-              title="Water"
-              icon="💧"
-              isOpen={openSection === 'water'}
-              onToggle={() => toggleSection('water')}
-              badge={countResets('water')}
-            >
-              <WaterMeterForm
-                meters={config?.water.meters || []}
-                onChange={() => {}}
-                useCustomMeterIds={false}
-                mode="reset"
-                resets={resets.water}
-                onResetChange={(meterId, field, value) => updateReset('water', meterId, field, value)}
-              />
-            </AccordionSection>
-
-            {/* Gas Section */}
-            <AccordionSection
-              title="Gas"
-              icon="🔥"
-              isOpen={openSection === 'gas'}
-              onToggle={() => toggleSection('gas')}
-              badge={countResets('gas')}
-            >
-              <GasMeterForm
-                meters={config?.gas.meters || []}
-                onChange={() => {}}
-                useCustomMeterIds={false}
-                mode="reset"
-                resets={resets.gas}
-                onResetChange={(meterId, field, value) => updateReset('gas', meterId, field, value)}
-              />
-            </AccordionSection>
-          </div>
-
-          {/* Footer Actions */}
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            {/* Counter - Full width on mobile, inline on desktop */}
-            <div className="text-center sm:text-right mb-4 sm:mb-0 sm:hidden">
-              <span className="text-sm text-gray-500">
-                {countResets('electricity') + countResets('water') + countResets('gas')} reset(s) configured
-              </span>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <button
-                onClick={() => navigate('/')}
-                className="text-gray-600 hover:text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                Cancel
-              </button>
-              
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-gray-500 hidden sm:inline">
-                  {countResets('electricity') + countResets('water') + countResets('gas')} reset(s) configured
-                </span>
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="py-2 px-6 bg-orange-600 text-white font-semibold rounded-lg hover:bg-orange-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                >
-                  {saving ? 'Saving...' : 'Save Resets'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Gas Section */}
+        <AccordionSection
+          title="Gas"
+          icon="🔥"
+          isOpen={openSection === 'gas'}
+          onToggle={() => toggleSection('gas')}
+          badge={countResets('gas')}
+        >
+          <GasMeterForm
+            meters={config?.gas.meters || []}
+            onChange={() => {}}
+            useCustomMeterIds={false}
+            mode="reset"
+            resets={resets.gas}
+            onResetChange={(meterId, field, value) => updateReset('gas', meterId, field, value)}
+          />
+        </AccordionSection>
       </div>
-    </div>
+
+      <FormFooter
+        onCancel={() => navigate('/')}
+        onSave={handleSave}
+        saveLabel="Save Resets"
+        counter={countResets('electricity') + countResets('water') + countResets('gas')}
+        counterLabel="reset(s) configured"
+        saving={saving}
+      />
+    </PageLayout>
   );
 }

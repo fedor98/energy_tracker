@@ -2,7 +2,7 @@
  * Add Reading Route
  * 
  * Entry form for adding new utility readings using an accordion layout.
- * Matches the design of the Setup route for consistency.
+ * Uses page-layout components for consistent design with Reset and Edit routes.
  * 
  * Flow:
  * 1. Date selection (fixed card at top)
@@ -16,12 +16,13 @@
  * - Shows count badge for meters with values entered
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { AccordionSection } from '../components/AccordionSection';
 import { ElectricityMeterForm } from '../components/ElectricityMeterForm';
 import { WaterMeterForm } from '../components/WaterMeterForm';
 import { GasMeterForm } from '../components/GasMeterForm';
+import { PageLayout, DateSection, FormFooter } from '../components/accordion-page-layout';
 import { getConfig, saveReadings, type AppConfig, type ReadingInput } from '../lib/api';
 
 type OpenSection = 'electricity' | 'water' | 'gas' | null;
@@ -41,7 +42,6 @@ export default function AddReading() {
   
   // Date for all readings
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const dateInputRef = useRef<HTMLInputElement>(null);
   
   // Readings state - meter_id -> value (as string for input handling)
   const [readings, setReadings] = useState<{
@@ -174,155 +174,86 @@ export default function AddReading() {
     }
   }
 
-  // Loading state
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-          <span className="text-gray-600">Loading...</span>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-white rounded-lg shadow-md p-4 sm:p-8">
-          <h1 className="text-2xl font-bold text-center text-gray-800 mb-2">
-            Add Readings
-          </h1>
-          <p className="text-gray-600 text-center mb-8">
-            Enter your meter readings below.
-          </p>
+    <PageLayout
+      title="Add Readings"
+      description="Enter your meter readings below."
+      loading={loading}
+      loadingText="Loading..."
+      error={error}
+      success={successMessage}
+    >
+      <DateSection
+        label="Measurement Date"
+        value={date}
+        onChange={setDate}
+      />
 
-          {/* Error Message */}
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-              {error}
-            </div>
-          )}
+      {/* Accordion Sections */}
+      <div className="space-y-0">
+        {/* Electricity Section */}
+        <AccordionSection
+          title="Electricity"
+          icon="⚡"
+          isOpen={openSection === 'electricity'}
+          onToggle={() => toggleSection('electricity')}
+          badge={countReadings('electricity')}
+        >
+          <ElectricityMeterForm
+            meters={config?.electricity.meters || []}
+            onChange={() => {}} // Not used in reading mode
+            useCustomMeterIds={false}
+            mode="reading"
+            readings={readings.electricity}
+            onReadingChange={(meterId, value) => updateReading('electricity', meterId, value)}
+          />
+        </AccordionSection>
 
-          {/* Success Message */}
-          {successMessage && (
-            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
-              {successMessage}
-            </div>
-          )}
+        {/* Water Section */}
+        <AccordionSection
+          title="Water"
+          icon="💧"
+          isOpen={openSection === 'water'}
+          onToggle={() => toggleSection('water')}
+          badge={countReadings('water')}
+        >
+          <WaterMeterForm
+            meters={config?.water.meters || []}
+            onChange={() => {}} // Not used in reading mode
+            useCustomMeterIds={false}
+            mode="reading"
+            readings={readings.water}
+            onReadingChange={(meterId, value) => updateReading('water', meterId, value)}
+          />
+        </AccordionSection>
 
-          {/* Date Section */}
-          <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Measurement Date
-            </label>
-            <div className="relative">
-              <input
-                ref={dateInputRef}
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer relative z-20"
-                style={{ WebkitAppearance: 'none' }}
-              />
-              <div
-                className="absolute inset-0 cursor-pointer sm:block hidden"
-                onClick={() => dateInputRef.current?.showPicker?.()}
-                style={{ zIndex: 10 }}
-              />
-            </div>
-          </div>
-
-          {/* Accordion Sections */}
-          <div className="space-y-0">
-            {/* Electricity Section */}
-            <AccordionSection
-              title="Electricity"
-              icon="⚡"
-              isOpen={openSection === 'electricity'}
-              onToggle={() => toggleSection('electricity')}
-              badge={countReadings('electricity')}
-            >
-              <ElectricityMeterForm
-                meters={config?.electricity.meters || []}
-                onChange={() => {}} // Not used in reading mode
-                useCustomMeterIds={false}
-                mode="reading"
-                readings={readings.electricity}
-                onReadingChange={(meterId, value) => updateReading('electricity', meterId, value)}
-              />
-            </AccordionSection>
-
-            {/* Water Section */}
-            <AccordionSection
-              title="Water"
-              icon="💧"
-              isOpen={openSection === 'water'}
-              onToggle={() => toggleSection('water')}
-              badge={countReadings('water')}
-            >
-              <WaterMeterForm
-                meters={config?.water.meters || []}
-                onChange={() => {}} // Not used in reading mode
-                useCustomMeterIds={false}
-                mode="reading"
-                readings={readings.water}
-                onReadingChange={(meterId, value) => updateReading('water', meterId, value)}
-              />
-            </AccordionSection>
-
-            {/* Gas Section */}
-            <AccordionSection
-              title="Gas"
-              icon="🔥"
-              isOpen={openSection === 'gas'}
-              onToggle={() => toggleSection('gas')}
-              badge={countReadings('gas')}
-            >
-              <GasMeterForm
-                meters={config?.gas.meters || []}
-                onChange={() => {}} // Not used in reading mode
-                useCustomMeterIds={false}
-                mode="reading"
-                readings={readings.gas}
-                onReadingChange={(meterId, value) => updateReading('gas', meterId, value)}
-              />
-            </AccordionSection>
-          </div>
-
-          {/* Footer Actions */}
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            {/* Counter - Full width on mobile, inline on desktop */}
-            <div className="text-center sm:text-right mb-4 sm:mb-0 sm:hidden">
-              <span className="text-sm text-gray-500">
-                {countReadings('electricity') + countReadings('water') + countReadings('gas')} reading(s) entered
-              </span>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <button
-                onClick={() => navigate('/')}
-                className="text-gray-600 hover:text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                Cancel
-              </button>
-              
-              <div className="flex items-center gap-4">
-                <span className="text-sm text-gray-500 hidden sm:inline">
-                  {countReadings('electricity') + countReadings('water') + countReadings('gas')} reading(s) entered
-                </span>
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="py-2 px-6 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                >
-                  {saving ? 'Saving...' : 'Save Readings'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        {/* Gas Section */}
+        <AccordionSection
+          title="Gas"
+          icon="🔥"
+          isOpen={openSection === 'gas'}
+          onToggle={() => toggleSection('gas')}
+          badge={countReadings('gas')}
+        >
+          <GasMeterForm
+            meters={config?.gas.meters || []}
+            onChange={() => {}} // Not used in reading mode
+            useCustomMeterIds={false}
+            mode="reading"
+            readings={readings.gas}
+            onReadingChange={(meterId, value) => updateReading('gas', meterId, value)}
+          />
+        </AccordionSection>
       </div>
-    </div>
+
+      <FormFooter
+        onCancel={() => navigate('/')}
+        onSave={handleSave}
+        saveLabel="Save Readings"
+        counter={countReadings('electricity') + countReadings('water') + countReadings('gas')}
+        counterLabel="reading(s) entered"
+        saving={saving}
+      />
+    </PageLayout>
   );
 }
