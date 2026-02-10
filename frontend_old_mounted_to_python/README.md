@@ -135,9 +135,52 @@ frontend/app/components/meter-forms/
 - ✅ Type-Safe: Compile-time Checks
 - 🧪 Testbar: Renderer einzeln testbar
 
+### Phase 5: Edit & Delete Flow ✅ (2026-02-10)
+
+Die `/edit` Route und der Delete-Flow wurden implementiert:
+
+**Edit Route (`/edit`):**
+- Tagesbasiertes Editieren aller Messwerte
+- Verwendet Accordion-Layout (einheitlich mit Add/Reset)
+- Datum editierbar (verschiebt alle Einträge auf neues Datum)
+- Reset-Einträge markiert mit Badge
+- Integration mit `GenericMeterForm` im `edit` mode
+
+**Delete Confirmation Dialog:**
+- Modal-Dialog mit Zusammenfassung der zu löschenden Einträge
+- Zeigt Anzahl pro Energietyp (Strom, Wasser, Gas)
+- Bestätigung erforderlich vor Löschen
+
+**Backend API-Endpunkte:**
+- `GET /api/readings/by-date/{date}` - Alle Messwerte eines Tages
+- `PUT /api/readings/by-date/{date}` - Tagesbasiertes Update
+- `DELETE /api/readings/by-date/{date}` - Tagesbasiertes Löschen
+
+**Dashboard Integration:**
+- Actions-Spalte in Tabellen (drei Punkte Menü)
+- Edit/Delete Optionen pro Datum
+- Automatischer Refetch nach Delete
+- Success-Messages
+
+### Phase 6: Layout Components ✅ (2026-02-10)
+
+**Neue Verzeichnisstruktur:**
+```
+frontend/app/components/accordion-page-layout/
+├── PageLayout.tsx      # Haupt-Wrapper mit Header, Messages, Loading
+├── DateSection.tsx     # Date-Picker mit grauem Hintergrund
+├── FormFooter.tsx      # Cancel/Save Buttons mit Counter
+└── index.ts           # Barrel Export
+```
+
+**Vorteile:**
+- Code-Reduktion in Add/Reset/Edit Routes (~30% weniger Code)
+- Maximale Konsistenz zwischen allen Formular-Seiten
+- Einfache Wartung (Änderungen an einer Stelle)
+
 ### TODOs
-- [ ] Reset Meter Button: Funktionalität implementieren
-- [ ] Edit Reading Route erstellen
+- [x] Edit Reading Route erstellen
+- [x] Delete Flow implementieren
 - [ ] Settings Route erstellen
 
 ## API-Endpunkte (Backend)

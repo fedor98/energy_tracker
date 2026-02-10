@@ -504,6 +504,132 @@
 
 ---
 
+## 2026-02-10 (Edit & Delete Flow + Layout Components)
+
+### Edit Reading Route Implementation
+**Status:** ✅ Abgeschlossen
+
+**Aktivitäten:**
+- Edit Route erstellt (`frontend/app/routes/edit.tsx`):
+  - URL-Parameter: `date` (YYYY-MM-DD) und `period` (YYYY-MM) für Navigation
+  - Accordion-Layout (einheitlich mit Add/Reset via PageLayout)
+  - Lädt alle Messwerte für ein Datum via `getReadingsByDate()`
+  - Datum editierbar (verschiebt alle Einträge auf neues Datum)
+  - Zeigt nur Accordion-Sektionen mit Daten
+  - Reset-Einträge markiert mit orangem Badge
+
+- GenericMeterForm erweitert um "edit" mode:
+  - Neuer `EditModeRenderer` mit Value- und Comment-Feldern
+  - Edit-Mode zeigt Reset-Badge für Reset-Einträge
+  - Zwei-Spalten Layout für Value und Comment
+  - Integration in alle drei MeterForm-Komponenten
+
+- Backend API-Endpunkte implementiert:
+  - `GET /api/readings/by-date/{date}` - Alle Messwerte eines Tages
+  - `PUT /api/readings/by-date/{date}` - Tagesbasiertes Update
+  - `DELETE /api/readings/by-date/{date}` - Tagesbasiertes Löschen
+  - `GET /api/readings/by-date/{date}/count` - Zählen für Confirmation Dialog
+
+**Entscheidungen:**
+- Tagesbasiertes Editieren (nicht einzelne Readings) für konsistente UX
+- Datum änderbar (beeinflusst alle Messwerte des Tages)
+- Accordion-Layout für einheitliches Design mit Add/Reset
+- Reset-Badge visuell hervorgehoben (orange statt grau)
+
+**Geänderte Dateien:**
+- `frontend/app/routes/edit.tsx` (neu)
+- `frontend/app/routes.ts` (+ edit route)
+- `frontend/app/components/meter-forms/EditModeRenderer.tsx` (neu)
+- `frontend/app/components/meter-forms/GenericMeterForm.tsx` (+ edit mode)
+- `frontend/app/components/meter-forms/types.ts` (+ EditData Interface)
+- `frontend/app/components/ElectricityMeterForm.tsx` (+ edit props)
+- `frontend/app/components/WaterMeterForm.tsx` (+ edit props)
+- `frontend/app/components/GasMeterForm.tsx` (+ edit props)
+- `backend/routes.py` (+ date-based endpoints)
+- `backend/db.py` (+ get/update/delete by date functions)
+- `backend/models.py` (+ EditData model)
+
+---
+
+### Delete Flow Implementation
+**Status:** ✅ Abgeschlossen
+
+**Aktivitäten:**
+- TableActionsMenu Komponente (`frontend/app/components/TableActionsMenu.tsx`):
+  - Drei-Punkte-Menü (MoreVertical Icon)
+  - Edit und Delete Optionen
+  - Click-Outside Handler
+  - Keyboard Navigation (Escape)
+
+- DeleteConfirmationDialog (`frontend/app/components/DeleteConfirmationDialog.tsx`):
+  - Modal mit Zusammenfassung
+  - Zeigt Anzahl pro Energietyp (Strom, Wasser, Gas)
+  - Lädt Counts via `countReadingsByDate()`
+  - Cancel und Delete Buttons
+  - Loading State während Count-Laden
+
+- Dashboard Integration:
+  - Actions-Spalte in MeterDataTable
+  - Edit-Handler (Navigation zu /edit)
+  - Delete-Handler (öffnet Confirmation Dialog)
+  - Automatischer Refetch nach Delete
+  - Success-Message nach Delete
+
+**Entscheidungen:**
+- Tagesbasiertes Löschen (alle Messwerte eines Tages)
+- Confirmation Dialog mit detaillierter Zusammenfassung
+- TableActionsMenu nur einmal pro Datum (nicht pro Zeile)
+- Success-Message statt sofortiger Navigation
+
+**Geänderte Dateien:**
+- `frontend/app/components/TableActionsMenu.tsx` (neu)
+- `frontend/app/components/DeleteConfirmationDialog.tsx` (neu)
+- `frontend/app/components/MeterDataTable.tsx` (+ Actions-Spalte)
+- `frontend/app/routes/dashboard.tsx` (+ Edit/Delete Handler)
+
+---
+
+### Accordion Page Layout Components
+**Status:** ✅ Abgeschlossen
+
+**Aktivitäten:**
+- Neues Verzeichnis `accordion-page-layout/`:
+  - `PageLayout.tsx`: Haupt-Wrapper mit Header, Messages, Loading
+  - `DateSection.tsx`: Date-Picker mit grauem Hintergrund
+  - `FormFooter.tsx`: Cancel/Save Buttons mit Counter
+  - `index.ts`: Barrel Export
+
+- Route Refactoring:
+  - Add-Route: ~329 → 232 Zeilen (-29%)
+  - Reset-Route: ~345 → 235 Zeilen (-32%)
+  - Edit-Route: Nutzt direkt Layout Components
+
+**Vorteile:**
+- Maximale Konsistenz zwischen allen Formular-Seiten
+- Keine Duplikation von JSX/Tailwind-Code
+- Änderungen am Design nur an einer Stelle
+- Einfachere Wartung und bessere Lesbarkeit
+
+**Entscheidungen:**
+- Ordnername `accordion-page-layout` (semantisch & selbsterklärend)
+- Props-basierte API für Flexibilität
+- TypeScript Interfaces exportiert für externe Nutzung
+
+**Geänderte Dateien:**
+- `frontend/app/components/accordion-page-layout/PageLayout.tsx` (neu)
+- `frontend/app/components/accordion-page-layout/DateSection.tsx` (neu)
+- `frontend/app/components/accordion-page-layout/FormFooter.tsx` (neu)
+- `frontend/app/components/accordion-page-layout/index.ts` (neu)
+- `frontend/app/routes/add.tsx` (refactored)
+- `frontend/app/routes/reset.tsx` (refactored)
+- `frontend/app/routes/edit.tsx` (nutzt Layout Components)
+
+**Build-Status:**
+- `npm run build` erfolgreich ✅
+- Keine Breaking Changes
+
+---
+
 ## Format für neue Einträge
 
 ```markdown

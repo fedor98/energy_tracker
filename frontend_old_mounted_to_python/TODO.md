@@ -87,12 +87,44 @@
   - [x] Refactoring: Nutzt jetzt MeterForm-Komponenten (reset mode)
   - [x] Einheitliches Design: Graue Boxen + Zaehlernummer-Badges
   - [x] Water: Emojis (🔴/🔵) statt Text für Warm/Kalt
-- [ ] **Edit Reading** (`/edit/:period`)
-  - [ ] Bestehende Readings laden
-  - [ ] Bearbeiten & Speichern
+- [x] **Edit Reading** (`/edit?date=YYYY-MM-DD&period=YYYY-MM`)
+  - [x] Route registriert in routes.ts
+  - [x] Accordion-Layout (einheitlich mit Add/Reset)
+  - [x] Tagesbasiertes Editieren aller Messwerte
+  - [x] Datum editierbar (verschiebt alle Einträge)
+  - [x] Reset-Einträge markiert mit Badge
+  - [x] Integration mit GenericMeterForm (edit mode)
+  - [x] Success-Messages und verbesserter Loading-State
 - [ ] **Settings** (`/settings`)
   - [ ] Config anzeigen
   - [ ] Reset-Funktion (von Dashboard hierher verschoben)
+
+### Phase 4: Edit & Delete Flow ✅
+- [x] **Dashboard Table Actions**
+  - [x] Actions-Spalte mit drei Punkte Menü
+  - [x] Edit-Option (navigation zu /edit)
+  - [x] Delete-Option (öffnet Confirmation Dialog)
+- [x] **Delete Confirmation Dialog**
+  - [x] Modal mit Zusammenfassung (Anzahl pro Energietyp)
+  - [x] Bestätigung erforderlich
+  - [x] API-Integration: DELETE /api/readings/by-date/{date}
+- [x] **Backend API-Endpunkte**
+  - [x] GET /api/readings/by-date/{date}
+  - [x] PUT /api/readings/by-date/{date}
+  - [x] DELETE /api/readings/by-date/{date}
+  - [x] GET /api/readings/by-date/{date}/count
+
+### Phase 5: Layout Components ✅
+- [x] **Accordion Page Layout Components**
+  - [x] PageLayout: Haupt-Wrapper mit Header, Messages, Loading
+  - [x] DateSection: Date-Picker mit grauem Hintergrund
+  - [x] FormFooter: Cancel/Save Buttons mit Counter
+  - [x] Barrel Export für einfache Imports
+- [x] **Route Refactoring**
+  - [x] Add-Route umgestellt auf Layout Components
+  - [x] Reset-Route umgestellt auf Layout Components  
+  - [x] Edit-Route umgestellt auf Layout Components
+  - [x] Code-Reduktion: ~30% weniger Code pro Route
 
 ### Phase 4: Navigation & Layout
 - [ ] Header mit Navigation
