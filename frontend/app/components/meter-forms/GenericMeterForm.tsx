@@ -12,6 +12,7 @@ import React from 'react';
 import { SetupModeRenderer } from './SetupModeRenderer';
 import { ReadingModeRenderer } from './ReadingModeRenderer';
 import { ResetModeRenderer } from './ResetModeRenderer';
+import { EditModeRenderer } from './EditModeRenderer';
 import type { MeterConfig, GenericMeterFormProps, MeterTypeConfig, FormMode } from './types';
 
 // Mode renderer registry using Strategy Pattern
@@ -22,6 +23,7 @@ const modeRenderers: Record<
   setup: SetupModeRenderer,
   reading: ReadingModeRenderer,
   reset: ResetModeRenderer,
+  edit: EditModeRenderer,
 };
 
 interface GenericMeterFormComponentProps<T extends MeterConfig> extends GenericMeterFormProps<T> {
@@ -37,6 +39,8 @@ export function GenericMeterForm<T extends MeterConfig>({
   onReadingChange,
   resets,
   onResetChange,
+  editData,
+  onEditChange,
   config,
 }: GenericMeterFormComponentProps<T>) {
   // Select the appropriate renderer based on mode
@@ -47,9 +51,9 @@ export function GenericMeterForm<T extends MeterConfig>({
     return (
       <SetupModeRenderer
         meters={meters}
-        onChange={onChange}
+        onChange={onChange!}
         config={config}
-        useCustomMeterIds={useCustomMeterIds}
+        useCustomMeterIds={useCustomMeterIds!}
       />
     );
   }
@@ -72,6 +76,17 @@ export function GenericMeterForm<T extends MeterConfig>({
         config={config}
         resets={resets}
         onResetChange={onResetChange}
+      />
+    );
+  }
+
+  if (mode === 'edit') {
+    return (
+      <EditModeRenderer
+        meters={meters}
+        config={config}
+        editData={editData}
+        onEditChange={onEditChange}
       />
     );
   }

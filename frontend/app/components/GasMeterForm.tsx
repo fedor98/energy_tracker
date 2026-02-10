@@ -8,17 +8,19 @@
 import React from 'react';
 import { GenericMeterForm, METER_TYPE_CONFIGS } from './meter-forms';
 import type { GasMeterConfig } from '../lib/api';
-import type { ResetData } from './meter-forms';
+import type { ResetData, EditData } from './meter-forms';
 
 interface GasMeterFormProps {
   meters: GasMeterConfig[];
   onChange: (meters: GasMeterConfig[]) => void;
   useCustomMeterIds: boolean;
-  mode?: 'setup' | 'reading' | 'reset';
+  mode?: 'setup' | 'reading' | 'reset' | 'edit';
   readings?: Record<string, string>;
   onReadingChange?: (meterId: string, value: string) => void;
   resets?: Record<string, ResetData>;
   onResetChange?: (meterId: string, field: 'last_reading' | 'reset_value', value: string) => void;
+  editData?: Record<string, EditData>;
+  onEditChange?: (meterId: string, field: 'value' | 'comment', value: string) => void;
 }
 
 export function GasMeterForm({
@@ -30,6 +32,8 @@ export function GasMeterForm({
   onReadingChange,
   resets,
   onResetChange,
+  editData,
+  onEditChange,
 }: GasMeterFormProps) {
   return (
     <GenericMeterForm
@@ -41,6 +45,8 @@ export function GasMeterForm({
       onReadingChange={onReadingChange}
       resets={resets}
       onResetChange={onResetChange}
+      editData={editData}
+      onEditChange={onEditChange}
       config={METER_TYPE_CONFIGS.gas}
     />
   );

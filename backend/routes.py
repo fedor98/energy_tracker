@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
+from pydantic import BaseModel
 from models import (
     AppConfig, 
     ReadingInput, 
@@ -35,7 +36,12 @@ from db import (
     delete_gas_reading,
     get_monthly_readings,
     get_calculation_details_by_type,
-    save_meter_resets
+    save_meter_resets,
+    get_readings_by_date,
+    count_readings_by_date,
+    get_meters_for_date,
+    update_readings_by_date,
+    delete_readings_by_date
 )
 from migration import migrate_legacy_data, check_migration_needed, get_migration_status
 
@@ -392,3 +398,108 @@ def create_meter_resets(resets: MeterResetsInput):
         return ResetResult(**result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save resets: {str(e)}")
+
+
+# Date-based Reading Operations Endpoints
+
+@router.get("/readings/by-date/{date}")
+def get_readings_for_date(date: str, is_reset: Optional[bool] = Query(None)):
+    """
+    Get all readings for a specific date.
+    
+    Args:
+        date: Date in YYYY-MM-DD format
+        is_reset: Filter by reset status (optional)
+    
+    Returns readings grouped by type (electricity, water, gas).
+    """
+    try:
+        readings = get_readings_by_date(date, is_reset)
+        return {
+            "date": date,
+            "electricity": [ElectricityReading(**r) for r in readings['electricity']],
+            "water": [WaterReading(**r) for r in readings['water']],
+            "gas": [GasReading(**r) for r in readings['gas']]
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch readings: {str(e)}")
+
+
+@router.get("/readings/by-date/{date}/count")
+def count_readings_for_date(date: str, is_reset: Optional[bool] = Query(None)):
+    """
+    Count readings for a specific date by type.
+    
+    Returns counts for electricity, water, gas, and total.
+    """
+    try:
+        counts = count_readings_by_date(date, is_reset)
+        return counts
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to count readings: {str(e)}")
+
+
+@router.get("/readings/by-date/{date}/meters")
+def get_meters_for_date_endpoint(date: str):
+    """
+    Get list of meters/rooms that have readings on a specific date.
+    
+    Returns lists for electricity (meter names), water (rooms), and gas (rooms).
+    """
+    try:
+        meters = get_meters_for_date(date)
+        return meters
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch meters: {str(e)}")
+
+
+class ReadingUpdateItem(BaseModel):
+    id: int
+    value: float
+    comment: Optional[str] = None
+
+
+class UpdateReadingsByDateRequest(BaseModel):
+    new_date: Optional[str] = None
+    electricity: List[ReadingUpdateItem] = []
+    water: List[ReadingUpdateItem] = []
+    gas: List[ReadingUpdateItem] = []
+
+
+@router.put("/readings/by-date/{date}")
+def update_readings_for_date(date: str, request: UpdateReadingsByDateRequest):
+    """
+    Update readings for a specific date.
+    
+    Can update values and optionally change the date.
+    All readings for the date will be updated to the new date if specified.
+    """
+    try:
+        result = update_readings_by_date(
+            date=date,
+            new_date=request.new_date,
+            electricity=[r.model_dump() for r in request.electricity],
+            water=[r.model_dump() for r in request.water],
+            gas=[r.model_dump() for r in request.gas]
+        )
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update readings: {str(e)}")
+
+
+@router.delete("/readings/by-date/{date}")
+def delete_readings_for_date(date: str, is_reset: Optional[bool] = Query(None)):
+    """
+    Delete all readings for a specific date.
+    
+    Args:
+        date: Date in YYYY-MM-DD format
+        is_reset: If True, only delete reset readings. If False, exclude reset readings.
+    
+    Returns counts of deleted readings by type.
+    """
+    try:
+        result = delete_readings_by_date(date, is_reset)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete readings: {str(e)}")

@@ -11,6 +11,7 @@ export { GenericMeterForm } from './GenericMeterForm';
 export { SetupModeRenderer } from './SetupModeRenderer';
 export { ReadingModeRenderer } from './ReadingModeRenderer';
 export { ResetModeRenderer } from './ResetModeRenderer';
+export { EditModeRenderer } from './EditModeRenderer';
 export { useMeterForm, useReadingForm, useResetForm } from './useMeterForm';
 export {
   METER_TYPE_CONFIGS,
@@ -24,6 +25,7 @@ export type {
   MeterType,
   FormMode,
   ResetData,
+  EditData,
   MeterTypeConfig,
   GenericMeterFormProps,
   ModeRendererProps,

@@ -41,6 +41,7 @@ export default function ResetMeter() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   
   // Accordion state - only one section open at a time
   const [openSection, setOpenSection] = useState<OpenSection>(null);
@@ -117,6 +118,7 @@ export default function ResetMeter() {
 
     setSaving(true);
     setError(null);
+    setSuccessMessage(null);
 
     try {
       const resetInput: MeterResetsInput = {
@@ -173,7 +175,12 @@ export default function ResetMeter() {
       });
 
       await saveResets(resetInput);
-      navigate('/');
+      setSuccessMessage('Resets saved successfully');
+      
+      // Navigate back to dashboard after a short delay
+      setTimeout(() => {
+        navigate('/');
+      }, 1500);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save resets');
       setSaving(false);
@@ -184,7 +191,10 @@ export default function ResetMeter() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <span className="text-gray-600">Loading...</span>
+        </div>
       </div>
     );
   }
@@ -207,6 +217,13 @@ export default function ResetMeter() {
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
               {error}
+            </div>
+          )}
+
+          {/* Success Message */}
+          {successMessage && (
+            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
+              {successMessage}
             </div>
           )}
 

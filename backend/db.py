@@ -1282,3 +1282,485 @@ def save_meter_resets(resets: MeterResetsInput) -> Dict[str, Any]:
         raise e
     finally:
         conn.close()
+
+
+# Date-based Reading Operations
+def get_readings_by_date(date: str, is_reset: Optional[bool] = None) -> Dict[str, List[Dict[str, Any]]]:
+    """
+    Get all readings for a specific date across all utility types.
+    
+    Args:
+        date: Date in YYYY-MM-DD format
+        is_reset: If True, only get reset readings. If False, exclude reset readings.
+                  If None, get all readings.
+    
+    Returns:
+        Dictionary with electricity, water, and gas readings for the date
+    """
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    # Build WHERE clause for is_reset filter
+    reset_filter = ""
+    params: List[Any] = [f"{date}%"]  # Match date prefix for datetime format
+    
+    if is_reset is not None:
+        reset_filter = " AND e.is_reset = ?"
+        params.append(1 if is_reset else 0)
+    
+    # Get electricity readings
+    c.execute(f'''
+        SELECT e.*,
+            SUBSTR(e.date, 1, 7) as period,
+            c.consumption_value as consumption,
+            c.calculation_details
+        FROM readings_electricity e
+        LEFT JOIN consumption_calc c ON SUBSTR(e.date, 1, 7) = c.period
+            AND c.entity_type = 'electricity'
+            AND c.entity_id = e.meter_name
+            AND c.meter_id = e.meter_id
+        WHERE e.date LIKE ?{reset_filter}
+        ORDER BY e.date, e.meter_name
+    ''', params)
+    electricity = [dict(row) for row in c.fetchall()]
+    
+    # Get water readings
+    params_water: List[Any] = [f"{date}%"]
+    if is_reset is not None:
+        reset_filter_water = " AND w.is_reset = ?"
+        params_water.append(1 if is_reset else 0)
+    else:
+        reset_filter_water = ""
+    
+    c.execute(f'''
+        SELECT w.*,
+            SUBSTR(w.date, 1, 7) as period,
+            c.calculation_details,
+            warm_agg.consumption_value as warm_water_consumption,
+            cold_agg.consumption_value as cold_water_consumption,
+            COALESCE(warm_agg.consumption_value, 0) + COALESCE(cold_agg.consumption_value, 0) as total_water_consumption
+        FROM readings_water w
+        LEFT JOIN consumption_calc c ON SUBSTR(w.date, 1, 7) = c.period
+            AND c.entity_type = CASE WHEN w.is_warm_water = 1 THEN 'water_warm' ELSE 'water_cold' END
+            AND c.entity_id = w.room
+            AND c.meter_id = w.meter_id
+        LEFT JOIN consumption_calc warm_agg ON SUBSTR(w.date, 1, 7) = warm_agg.period
+            AND warm_agg.entity_type = 'water_warm'
+            AND warm_agg.entity_id = w.room
+            AND warm_agg.meter_id = w.meter_id
+        LEFT JOIN consumption_calc cold_agg ON SUBSTR(w.date, 1, 7) = cold_agg.period
+            AND cold_agg.entity_type = 'water_cold'
+            AND cold_agg.entity_id = w.room
+            AND cold_agg.meter_id = w.meter_id
+        WHERE w.date LIKE ?{reset_filter_water}
+        ORDER BY w.date, w.room, w.is_warm_water
+    ''', params_water)
+    water = [dict(row) for row in c.fetchall()]
+    
+    # Get gas readings
+    params_gas: List[Any] = [f"{date}%"]
+    if is_reset is not None:
+        reset_filter_gas = " AND g.is_reset = ?"
+        params_gas.append(1 if is_reset else 0)
+    else:
+        reset_filter_gas = ""
+    
+    c.execute(f'''
+        SELECT g.*,
+            SUBSTR(g.date, 1, 7) as period,
+            c.consumption_value as consumption,
+            c.calculation_details
+        FROM readings_gas g
+        LEFT JOIN consumption_calc c ON SUBSTR(g.date, 1, 7) = c.period
+            AND c.entity_type = 'gas'
+            AND c.entity_id = g.room
+            AND c.meter_id = g.meter_id
+        WHERE g.date LIKE ?{reset_filter_gas}
+        ORDER BY g.date, g.room
+    ''', params_gas)
+    gas = [dict(row) for row in c.fetchall()]
+    
+    conn.close()
+    
+    return {
+        'electricity': electricity,
+        'water': water,
+        'gas': gas
+    }
+
+
+def count_readings_by_date(date: str, is_reset: Optional[bool] = None) -> Dict[str, Any]:
+    """
+    Count readings for a specific date by type.
+    
+    Returns:
+        Dictionary with counts for each type and total
+    """
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    # Build WHERE clause for is_reset filter
+    reset_filter = ""
+    params: List[Any] = [f"{date}%"]
+    
+    if is_reset is not None:
+        reset_filter = " AND is_reset = ?"
+        params.append(1 if is_reset else 0)
+    
+    # Count electricity readings
+    c.execute(f'''
+        SELECT COUNT(*) FROM readings_electricity
+        WHERE date LIKE ?{reset_filter}
+    ''', params)
+    electricity_count = c.fetchone()[0]
+    
+    # Count water readings
+    params_water: List[Any] = [f"{date}%"]
+    if is_reset is not None:
+        params_water.append(1 if is_reset else 0)
+    
+    c.execute(f'''
+        SELECT COUNT(*) FROM readings_water
+        WHERE date LIKE ?{reset_filter}
+    ''', params_water)
+    water_count = c.fetchone()[0]
+    
+    # Count gas readings
+    params_gas: List[Any] = [f"{date}%"]
+    if is_reset is not None:
+        params_gas.append(1 if is_reset else 0)
+    
+    c.execute(f'''
+        SELECT COUNT(*) FROM readings_gas
+        WHERE date LIKE ?{reset_filter}
+    ''', params_gas)
+    gas_count = c.fetchone()[0]
+    
+    conn.close()
+    
+    total = electricity_count + water_count + gas_count
+    
+    return {
+        'electricity': electricity_count,
+        'water': water_count,
+        'gas': gas_count,
+        'total': total
+    }
+
+
+def get_meters_for_date(date: str) -> Dict[str, List[str]]:
+    """
+    Get list of unique meters/rooms that have readings on a specific date.
+    
+    Returns:
+        Dictionary with meter lists for each type
+    """
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    # Get electricity meters
+    c.execute('''
+        SELECT DISTINCT meter_name FROM readings_electricity
+        WHERE date LIKE ?
+        ORDER BY meter_name
+    ''', (f"{date}%",))
+    electricity_meters = [row[0] for row in c.fetchall()]
+    
+    # Get water rooms
+    c.execute('''
+        SELECT DISTINCT room FROM readings_water
+        WHERE date LIKE ?
+        ORDER BY room
+    ''', (f"{date}%",))
+    water_rooms = [row[0] for row in c.fetchall()]
+    
+    # Get gas rooms
+    c.execute('''
+        SELECT DISTINCT room FROM readings_gas
+        WHERE date LIKE ?
+        ORDER BY room
+    ''', (f"{date}%",))
+    gas_rooms = [row[0] for row in c.fetchall()]
+    
+    conn.close()
+    
+    return {
+        'electricity': electricity_meters,
+        'water': water_rooms,
+        'gas': gas_rooms
+    }
+
+
+def update_readings_by_date(
+    date: str,
+    new_date: Optional[str],
+    electricity: List[Dict[str, Any]],
+    water: List[Dict[str, Any]],
+    gas: List[Dict[str, Any]]
+) -> Dict[str, Any]:
+    """
+    Update readings for a specific date.
+    
+    Args:
+        date: Original date in YYYY-MM-DD format
+        new_date: New date if date should be changed (optional)
+        electricity: List of electricity reading updates with id, value, comment
+        water: List of water reading updates
+        gas: List of gas reading updates
+    
+    Returns:
+        Dictionary with update counts
+    """
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    updated_electricity = 0
+    updated_water = 0
+    updated_gas = 0
+    moved_count = 0
+    
+    try:
+        # Update electricity readings
+        for reading in electricity:
+            reading_id = reading['id']
+            new_date_value = new_date if new_date else date
+            
+            # Get current reading info
+            c.execute('''
+                SELECT meter_name, meter_id, date, is_reset FROM readings_electricity
+                WHERE id = ?
+            ''', (reading_id,))
+            current = c.fetchone()
+            
+            if current:
+                # Update value and comment
+                c.execute('''
+                    UPDATE readings_electricity
+                    SET value = ?, comment = ?, date = ?
+                    WHERE id = ?
+                ''', (
+                    reading['value'],
+                    reading.get('comment'),
+                    new_date_value if not current['is_reset'] else f"{new_date_value} {current['date'].split(' ')[1] if ' ' in current['date'] else '00:00:00'}",
+                    reading_id
+                ))
+                
+                if c.rowcount > 0:
+                    updated_electricity += 1
+                    
+                    # If date changed and this is not a reset reading, mark as moved
+                    if new_date and new_date != date and not current['is_reset']:
+                        moved_count += 1
+                    
+                    # Recalculate consumption
+                    _calculate_electricity_consumption(conn, current['meter_name'], new_date_value)
+        
+        # Update water readings
+        for reading in water:
+            reading_id = reading['id']
+            new_date_value = new_date if new_date else date
+            
+            c.execute('''
+                SELECT room, meter_id, date, is_warm_water, is_reset FROM readings_water
+                WHERE id = ?
+            ''', (reading_id,))
+            current = c.fetchone()
+            
+            if current:
+                c.execute('''
+                    UPDATE readings_water
+                    SET value = ?, comment = ?, date = ?
+                    WHERE id = ?
+                ''', (
+                    reading['value'],
+                    reading.get('comment'),
+                    new_date_value if not current['is_reset'] else f"{new_date_value} {current['date'].split(' ')[1] if ' ' in current['date'] else '00:00:00'}",
+                    reading_id
+                ))
+                
+                if c.rowcount > 0:
+                    updated_water += 1
+                    
+                    if new_date and new_date != date and not current['is_reset']:
+                        moved_count += 1
+                    
+                    _calculate_water_consumption(conn, current['room'], new_date_value, current['is_warm_water'])
+        
+        # Update gas readings
+        for reading in gas:
+            reading_id = reading['id']
+            new_date_value = new_date if new_date else date
+            
+            c.execute('''
+                SELECT room, meter_id, date, is_reset FROM readings_gas
+                WHERE id = ?
+            ''', (reading_id,))
+            current = c.fetchone()
+            
+            if current:
+                c.execute('''
+                    UPDATE readings_gas
+                    SET value = ?, comment = ?, date = ?
+                    WHERE id = ?
+                ''', (
+                    reading['value'],
+                    reading.get('comment'),
+                    new_date_value if not current['is_reset'] else f"{new_date_value} {current['date'].split(' ')[1] if ' ' in current['date'] else '00:00:00'}",
+                    reading_id
+                ))
+                
+                if c.rowcount > 0:
+                    updated_gas += 1
+                    
+                    if new_date and new_date != date and not current['is_reset']:
+                        moved_count += 1
+                    
+                    _calculate_gas_consumption(conn, current['room'], new_date_value)
+        
+        conn.commit()
+        
+        return {
+            'electricity': updated_electricity,
+            'water': updated_water,
+            'gas': updated_gas,
+            'moved': moved_count,
+            'old_date': date,
+            'new_date': new_date if new_date else date,
+            'message': f"Successfully updated {updated_electricity + updated_water + updated_gas} readings"
+        }
+        
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+
+def delete_readings_by_date(date: str, is_reset: Optional[bool] = None) -> Dict[str, Any]:
+    """
+    Delete all readings for a specific date.
+    
+    Args:
+        date: Date in YYYY-MM-DD format
+        is_reset: If True, only delete reset readings. If False, exclude reset readings.
+                  If None, delete all readings.
+    
+    Returns:
+        Dictionary with delete counts
+    """
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    # Build WHERE clause
+    reset_filter = ""
+    params: List[Any] = [f"{date}%"]
+    
+    if is_reset is not None:
+        reset_filter = " AND is_reset = ?"
+        params.append(1 if is_reset else 0)
+    
+    try:
+        # Get info before deleting for consumption recalculation
+        c.execute(f'''
+            SELECT DISTINCT meter_name, SUBSTR(date, 1, 7) as period
+            FROM readings_electricity
+            WHERE date LIKE ?{reset_filter}
+        ''', params)
+        elec_meters = c.fetchall()
+        
+        c.execute(f'''
+            SELECT DISTINCT room, SUBSTR(date, 1, 7) as period
+            FROM readings_water
+            WHERE date LIKE ?{reset_filter}
+        ''', params)
+        water_rooms = c.fetchall()
+        
+        c.execute(f'''
+            SELECT DISTINCT room, SUBSTR(date, 1, 7) as period
+            FROM readings_gas
+            WHERE date LIKE ?{reset_filter}
+        ''', params)
+        gas_rooms = c.fetchall()
+        
+        # Delete electricity readings
+        c.execute(f'''
+            DELETE FROM readings_electricity
+            WHERE date LIKE ?{reset_filter}
+        ''', params)
+        deleted_electricity = c.rowcount
+        
+        # Delete water readings
+        params_water: List[Any] = [f"{date}%"]
+        if is_reset is not None:
+            params_water.append(1 if is_reset else 0)
+        
+        c.execute(f'''
+            DELETE FROM readings_water
+            WHERE date LIKE ?{reset_filter}
+        ''', params_water)
+        deleted_water = c.rowcount
+        
+        # Delete gas readings
+        params_gas: List[Any] = [f"{date}%"]
+        if is_reset is not None:
+            params_gas.append(1 if is_reset else 0)
+        
+        c.execute(f'''
+            DELETE FROM readings_gas
+            WHERE date LIKE ?{reset_filter}
+        ''', params_gas)
+        deleted_gas = c.rowcount
+        
+        # Delete associated consumption calculations
+        periods = set()
+        for row in elec_meters:
+            periods.add(row['period'])
+        for row in water_rooms:
+            periods.add(row['period'])
+        for row in gas_rooms:
+            periods.add(row['period'])
+        
+        for period in periods:
+            c.execute('''
+                DELETE FROM consumption_calc
+                WHERE period = ?
+            ''', (period,))
+        
+        conn.commit()
+        
+        # Recalculate consumption for affected meters/rooms
+        for meter in elec_meters:
+            try:
+                _calculate_electricity_consumption(conn, meter['meter_name'], f"{meter['period']}-01")
+            except:
+                pass
+        
+        for room in water_rooms:
+            try:
+                _calculate_water_consumption(conn, room['room'], f"{room['period']}-01")
+            except:
+                pass
+        
+        for room in gas_rooms:
+            try:
+                _calculate_gas_consumption(conn, room['room'], f"{room['period']}-01")
+            except:
+                pass
+        
+        conn.commit()
+        
+        total = deleted_electricity + deleted_water + deleted_gas
+        
+        return {
+            'electricity': deleted_electricity,
+            'water': deleted_water,
+            'gas': deleted_gas,
+            'deleted': total,
+            'message': f"Successfully deleted {total} readings"
+        }
+        
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()

@@ -19,12 +19,19 @@ export type MeterConfig = GasMeterConfig | WaterMeterConfig | ElectricityMeterCo
 export type MeterType = 'gas' | 'water' | 'electricity';
 
 // Form modes
-export type FormMode = 'setup' | 'reading' | 'reset';
+export type FormMode = 'setup' | 'reading' | 'reset' | 'edit';
 
 // Reset data structure
 export interface ResetData {
   last_reading: string;
   reset_value: string;
+}
+
+// Edit data structure for edit mode
+export interface EditData {
+  value: string;
+  comment: string;
+  isReset: boolean;
 }
 
 // Configuration for each meter type
@@ -78,13 +85,15 @@ export const METER_TYPE_CONFIGS: Record<MeterType, MeterTypeConfig> = {
 // Generic props for meter forms
 export interface GenericMeterFormProps<T extends MeterConfig> {
   meters: T[];
-  onChange: (meters: T[]) => void;
-  useCustomMeterIds: boolean;
+  onChange?: (meters: T[]) => void;
+  useCustomMeterIds?: boolean;
   mode?: FormMode;
   readings?: Record<string, string>;
   onReadingChange?: (meterId: string, value: string) => void;
   resets?: Record<string, ResetData>;
   onResetChange?: (meterId: string, field: 'last_reading' | 'reset_value', value: string) => void;
+  editData?: Record<string, EditData>;
+  onEditChange?: (meterId: string, field: 'value' | 'comment', value: string) => void;
 }
 
 // Props for mode renderers
@@ -95,6 +104,8 @@ export interface ModeRendererProps<T extends MeterConfig> {
   onReadingChange?: (meterId: string, value: string) => void;
   resets?: Record<string, ResetData>;
   onResetChange?: (meterId: string, field: 'last_reading' | 'reset_value', value: string) => void;
+  editData?: Record<string, EditData>;
+  onEditChange?: (meterId: string, field: 'value' | 'comment', value: string) => void;
 }
 
 // Props for setup mode

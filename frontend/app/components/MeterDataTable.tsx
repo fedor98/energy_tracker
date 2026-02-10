@@ -10,17 +10,22 @@
  * - Water readings include warm/cold indicators (🔴/🔵)
  * - Sorts meters alphabetically within each month
  * - Displays values with 2 decimal precision
+ * - Optional actions column with Edit/Delete menu
  * 
  * The table shows readings in reverse chronological order (newest first).
  */
 
 import type { ElectricityReading, WaterReading, GasReading } from '../lib/api';
+import { TableActionsMenu } from './TableActionsMenu';
 
 type MeterData = ElectricityReading | WaterReading | GasReading;
 
 interface MeterDataTableProps {
   data: MeterData[];
   type: 'electricity' | 'water' | 'gas';
+  showActions?: boolean;
+  onEdit?: (date: string) => void;
+  onDelete?: (date: string) => void;
 }
 
 /**
@@ -74,11 +79,11 @@ function sortByMeterName(a: MeterData, b: MeterData): number {
 
 /**
  * Renders the appropriate header columns based on utility type.
- * Electricity: Date | Meter | Value
- * Water: Date | Room | Value (with warm/cold indicator)
- * Gas: Date | Room | Value
+ * Electricity: Date | Meter | Value | Actions (optional)
+ * Water: Date | Room | Value (with warm/cold indicator) | Actions (optional)
+ * Gas: Date | Room | Value | Actions (optional)
  */
-function renderTableHeader(type: 'electricity' | 'water' | 'gas') {
+function renderTableHeader(type: 'electricity' | 'water' | 'gas', showActions?: boolean) {
   const baseHeaderClass =
     'px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider';
 
@@ -88,6 +93,7 @@ function renderTableHeader(type: 'electricity' | 'water' | 'gas') {
         <th className={baseHeaderClass}>Date</th>
         <th className={baseHeaderClass}>Meter</th>
         <th className={`${baseHeaderClass} text-right`}>Value</th>
+        {showActions && <th className={`${baseHeaderClass} text-center`}>Actions</th>}
       </>
     );
   }
@@ -98,6 +104,7 @@ function renderTableHeader(type: 'electricity' | 'water' | 'gas') {
       <th className={baseHeaderClass}>Date</th>
       <th className={baseHeaderClass}>Room</th>
       <th className={`${baseHeaderClass} text-right`}>Value</th>
+      {showActions && <th className={`${baseHeaderClass} text-center`}>Actions</th>}
     </>
   );
 }
@@ -110,7 +117,11 @@ function renderTableHeader(type: 'electricity' | 'water' | 'gas') {
 function renderTableRow(
   row: MeterData,
   type: 'electricity' | 'water' | 'gas',
-  isFirstInMonth: boolean
+  isFirstInMonth: boolean,
+  isFirstRowOfDate: boolean,
+  showActions?: boolean,
+  onEdit?: (date: string) => void,
+  onDelete?: (date: string) => void
 ) {
   const baseCellClass = 'px-4 py-3 text-sm';
 
@@ -143,6 +154,11 @@ function renderTableRow(
     return '-';
   };
 
+  // Extract just the date part (YYYY-MM-DD) for the actions menu
+  const getDateKey = (dateStr: string): string => {
+    return dateStr.split(' ')[0]; // Remove time part if present
+  };
+
   return (
     <tr className="hover:bg-gray-50 transition-colors">
       <td
@@ -166,6 +182,21 @@ function renderTableRow(
       >
         {formatValue(row.value)} {unit}
       </td>
+      {showActions && (
+        <td
+          className={`${baseCellClass} text-center ${
+            isFirstInMonth ? 'border-t-2 border-gray-300' : ''
+          }`}
+        >
+          {isFirstRowOfDate && onEdit && onDelete && (
+            <TableActionsMenu
+              date={getDateKey(row.date)}
+              onEdit={onEdit}
+              onDelete={onDelete}
+            />
+          )}
+        </td>
+      )}
     </tr>
   );
 }
@@ -174,7 +205,13 @@ function renderTableRow(
  * Main component that renders a data table for meter readings.
  * Organizes data by period with visual separators between months.
  */
-export function MeterDataTable({ data, type }: MeterDataTableProps) {
+export function MeterDataTable({
+  data,
+  type,
+  showActions = false,
+  onEdit,
+  onDelete
+}: MeterDataTableProps) {
   // Handle empty state
   if (data.length === 0) {
     return (
@@ -191,11 +228,14 @@ export function MeterDataTable({ data, type }: MeterDataTableProps) {
   const grouped = groupByPeriod(data);
   const sortedPeriods = Object.keys(grouped).sort().reverse(); // Newest first
 
+  // Track which dates we've seen to show actions only once per date
+  const seenDates = new Set<string>();
+
   return (
     <div className="overflow-x-auto">
       <table className="data-table min-w-full">
         <thead className="bg-gray-50">
-          <tr>{renderTableHeader(type)}</tr>
+          <tr>{renderTableHeader(type, showActions)}</tr>
         </thead>
 
         <tbody className="divide-y divide-gray-200">
@@ -204,9 +244,24 @@ export function MeterDataTable({ data, type }: MeterDataTableProps) {
             // Sort meters alphabetically within this period
             const sortedRows = [...periodRows].sort(sortByMeterName);
 
-            return sortedRows.map((row, index) =>
-              renderTableRow(row, type, index === 0)
-            );
+            return sortedRows.map((row, index) => {
+              // Track date changes for actions column
+              const dateKey = row.date.split(' ')[0]; // Remove time part
+              const isFirstRowOfDate = !seenDates.has(dateKey);
+              if (isFirstRowOfDate) {
+                seenDates.add(dateKey);
+              }
+
+              return renderTableRow(
+                row,
+                type,
+                index === 0,
+                isFirstRowOfDate,
+                showActions,
+                onEdit,
+                onDelete
+              );
+            });
           })}
         </tbody>
       </table>

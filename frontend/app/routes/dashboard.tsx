@@ -25,6 +25,7 @@ import {
   getWaterCalculations,
   getGasCalculations,
   getConfig,
+  deleteReadingsByDate,
 } from '../lib/api';
 import type {
   ElectricityReading,
@@ -35,6 +36,7 @@ import type {
 import { ConsumptionChart } from '../components/ConsumptionChart';
 import { CalculationTables } from '../components/CalculationTables';
 import { MeterDataTable } from '../components/MeterDataTable';
+import { DeleteConfirmationDialog } from '../components/DeleteConfirmationDialog';
 
 // Tab configuration for the dashboard - matches original layout
 const DASHBOARD_TABS = [
@@ -206,6 +208,11 @@ export default function Dashboard() {
   const [loadingCalculations, setLoadingCalculations] = useState<boolean>(false);
   const [checkingConfig, setCheckingConfig] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  // Delete dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [dateToDelete, setDateToDelete] = useState<string | null>(null);
 
   /**
    * Check if app is configured on mount - redirect to setup if not
@@ -318,6 +325,62 @@ export default function Dashboard() {
   };
 
   /**
+   * Handle edit action - navigate to edit route
+   */
+  const handleEdit = (date: string) => {
+    navigate(`/edit?date=${date}&period=${startMonth || endMonth}`);
+  };
+
+  /**
+   * Handle delete action - open confirmation dialog
+   */
+  const handleDeleteClick = (date: string) => {
+    setDateToDelete(date);
+    setDeleteDialogOpen(true);
+  };
+
+  /**
+   * Handle confirmed delete action
+   */
+  const handleDeleteConfirm = async () => {
+    if (!dateToDelete) return;
+
+    try {
+      await deleteReadingsByDate(dateToDelete);
+      setSuccessMessage('Readings deleted successfully');
+      setDeleteDialogOpen(false);
+      setDateToDelete(null);
+
+      // Refresh data
+      const [elecData, waterDataResult, gasDataResult] = await Promise.all([
+        getElectricityReadings({ start: startMonth, end: endMonth }),
+        getWaterReadings({ start: startMonth, end: endMonth }),
+        getGasReadings({ start: startMonth, end: endMonth }),
+      ]);
+
+      setElectricityData(elecData);
+      setWaterData(waterDataResult);
+      setGasData(gasDataResult);
+
+      // Clear success message after 3 seconds
+      setTimeout(() => {
+        setSuccessMessage(null);
+      }, 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete readings');
+      setDeleteDialogOpen(false);
+    }
+  };
+
+  /**
+   * Handle cancel delete
+   */
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setDateToDelete(null);
+  };
+
+  /**
    * Render the appropriate content based on active tab
    */
   const renderTabContent = () => {
@@ -352,13 +415,37 @@ export default function Dashboard() {
         );
 
       case 'electricity':
-        return <MeterDataTable data={electricityData} type="electricity" />;
+        return (
+          <MeterDataTable
+            data={electricityData}
+            type="electricity"
+            showActions={true}
+            onEdit={handleEdit}
+            onDelete={handleDeleteClick}
+          />
+        );
 
       case 'water':
-        return <MeterDataTable data={waterData} type="water" />;
+        return (
+          <MeterDataTable
+            data={waterData}
+            type="water"
+            showActions={true}
+            onEdit={handleEdit}
+            onDelete={handleDeleteClick}
+          />
+        );
 
       case 'gas':
-        return <MeterDataTable data={gasData} type="gas" />;
+        return (
+          <MeterDataTable
+            data={gasData}
+            type="gas"
+            showActions={true}
+            onEdit={handleEdit}
+            onDelete={handleDeleteClick}
+          />
+        );
 
       default:
         return null;
@@ -486,6 +573,21 @@ export default function Dashboard() {
             <p className="text-red-700">Error loading data: {error}</p>
           </div>
         )}
+
+        {/* Success Message Display */}
+        {successMessage && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-md animate-in fade-in slide-in-from-top-2 duration-300">
+            <p className="text-green-700">{successMessage}</p>
+          </div>
+        )}
+
+        {/* Delete Confirmation Dialog */}
+        <DeleteConfirmationDialog
+          date={dateToDelete || ''}
+          isOpen={deleteDialogOpen}
+          onClose={handleDeleteCancel}
+          onConfirm={handleDeleteConfirm}
+        />
 
         {/* Main Content Area */}
         <Card>
