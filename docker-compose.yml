@@ -25,7 +25,7 @@ services:
       - CHOKIDAR_USEPOLLING=true
       - WATCHPACK_POLLING=true
     depends_on:
-      - backend
+      - backend-dev
     restart: unless-stopped
 
   # Backend API (shared between dev and prod)
