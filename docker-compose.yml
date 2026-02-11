@@ -1,9 +1,12 @@
 services:
   # =============================================================================
-  # Frontend Development Service
-  # Runs Vite dev server with hot reload on port 5173
+  # DEVELOPMENT SERVICES
   # =============================================================================
+  
+  # Development Frontend (Vite dev server with hot reload)
   frontend-dev:
+    profiles:
+      - dev
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -25,32 +28,13 @@ services:
       - backend
     restart: unless-stopped
 
-  # =============================================================================
-  # Frontend Production Service
-  # Serves built React app via nginx on port 8080
-  # Includes reverse proxy to backend API
-  # =============================================================================
-  frontend-prod:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      target: final
-    container_name: energy_tracker-frontend-prod
-    ports:
-      # Host port 8080 -> Container port 80 (Nginx)
-      - "8080:80"
-    depends_on:
-      - backend
-    restart: unless-stopped
-
-  # =============================================================================
-  # Backend API Service
-  # FastAPI application serving JSON APIs under /api/*
-  # =============================================================================
-  backend:
+  # Backend API (shared between dev and prod)
+  backend-dev:
+    profiles:
+      - dev
     build:
       context: ./backend
-    container_name: energy_tracker-backend
+    container_name: energy_tracker-backend-dev
     expose:
       # "expose" makes port accessible within Docker network only
       # Backend is accessed via service name "backend" from frontend containers
@@ -60,7 +44,23 @@ services:
       - ./backend/data:/app/data/
       # Mount source for development (auto-reload)
       - ./backend:/app
-    # Optional: Uncomment to expose backend directly on host for debugging
-    # ports:
-    #   - "8000:8000"
+    restart: unless-stopped
+
+  # =============================================================================
+  # PRODUCTION SERVICE (Single Container)
+  # =============================================================================
+  
+  # Production: nginx + Python + React in one container
+  app:
+    profiles:
+      - prod
+    build:
+      context: .
+      dockerfile: production/Dockerfile
+    container_name: energy_tracker-app
+    ports:
+      - "8080:80"
+    volumes:
+      # Persist SQLite database
+      - ./backend/data:/app/data
     restart: unless-stopped
