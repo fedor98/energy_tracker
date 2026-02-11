@@ -19,3 +19,8 @@ coverage.xml
 .mypy_cache
 .pytest_cache
 .hypotheses
+
+.react-router
+build
+node_modules
+README.md

@@ -1,11 +1,66 @@
 services:
-  app:
-    build: .
-    container_name: energy_tracker
+  # =============================================================================
+  # Frontend Development Service
+  # Runs Vite dev server with hot reload on port 5173
+  # =============================================================================
+  frontend-dev:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: dev
+    container_name: energy_tracker-frontend-dev
     ports:
-      - "8000:8000"
+      # Host port 5173 -> Container port 5173 (Vite dev server)
+      - "5173:5173"
     volumes:
-      - ./data:/app/data
-      - ./frontend:/app/frontend
-      - ./app:/app/app
+      # # Use anonymous volume for node_modules (preserve installed deps)
+      # - /app/node_modules
+      # Mount source code for hot reload
+      - ./frontend:/app
+    environment:
+      # Ensure Vite detects file changes in Docker volume mounts
+      - CHOKIDAR_USEPOLLING=true
+      - WATCHPACK_POLLING=true
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # =============================================================================
+  # Frontend Production Service
+  # Serves built React app via nginx on port 8080
+  # Includes reverse proxy to backend API
+  # =============================================================================
+  frontend-prod:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: final
+    container_name: energy_tracker-frontend-prod
+    ports:
+      # Host port 8080 -> Container port 80 (Nginx)
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # =============================================================================
+  # Backend API Service
+  # FastAPI application serving JSON APIs under /api/*
+  # =============================================================================
+  backend:
+    build:
+      context: ./backend
+    container_name: energy_tracker-backend
+    expose:
+      # "expose" makes port accessible within Docker network only
+      # Backend is accessed via service name "backend" from frontend containers
+      - "8000"
+    volumes:
+      # Persist database files
+      - ./backend/data:/app/data/
+      # Mount source for development (auto-reload)
+      - ./backend:/app
+    # Optional: Uncomment to expose backend directly on host for debugging
+    # ports:
+    #   - "8000:8000"
     restart: unless-stopped
