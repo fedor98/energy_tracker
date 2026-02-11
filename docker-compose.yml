@@ -13,10 +13,10 @@ services:
       # Host port 5173 -> Container port 5173 (Vite dev server)
       - "5173:5173"
     volumes:
+      # # Use anonymous volume for node_modules (preserve installed deps)
+      # - /app/node_modules
       # Mount source code for hot reload
       - ./frontend:/app
-      # Use anonymous volume for node_modules (preserve installed deps)
-      - /app/node_modules
     environment:
       # Ensure Vite detects file changes in Docker volume mounts
       - CHOKIDAR_USEPOLLING=true
