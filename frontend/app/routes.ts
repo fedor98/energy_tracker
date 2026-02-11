@@ -9,6 +9,7 @@ import { type RouteConfig, index, route } from "@react-router/dev/routes";
  * - /add: Add Reading - Multi-step wizard for entering new meter readings
  * - /reset: Reset Meter - Record meter replacement entries
  * - /edit: Edit Readings - Edit all readings for a specific date
+ * - /settings: Settings - Database maintenance and app configuration
  */
 export default [
   index("routes/dashboard.tsx"),
@@ -16,4 +17,5 @@ export default [
   route("add", "routes/add.tsx"),
   route("reset", "routes/reset.tsx"),
   route("edit", "routes/edit.tsx"),
+  route("settings", "routes/settings.tsx"),
 ] satisfies RouteConfig;

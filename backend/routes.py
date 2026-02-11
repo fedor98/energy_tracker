@@ -15,10 +15,13 @@ from models import (
     ResetResult
 )
 from db import (
-    get_config, 
-    save_config, 
+    get_config,
+    save_config,
     backup_and_reset_db,
     reorganize_tables,
+    list_backups,
+    restore_from_backup,
+    recalculate_all_consumption,
     save_electricity_reading,
     save_water_reading,
     save_gas_reading,
@@ -310,6 +313,45 @@ def reorganize_database():
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Reorganization failed: {str(e)}")
+
+
+@router.get("/maintenance/backups")
+def get_backups():
+    """List all available backup files."""
+    try:
+        backups = list_backups()
+        return {"backups": backups}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to list backups: {str(e)}")
+
+
+class RestoreRequest(BaseModel):
+    backup_path: str
+
+
+@router.post("/maintenance/restore")
+def restore_database(request: RestoreRequest):
+    """Restore database from a backup file. Creates a backup of current state before restoring."""
+    try:
+        result = restore_from_backup(request.backup_path)
+        return result
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Restore failed: {str(e)}")
+
+
+@router.post("/maintenance/recalculate")
+def recalculate_consumption():
+    """Recalculate all consumption calculations from scratch. Clears consumption_calc table first."""
+    try:
+        result = recalculate_all_consumption()
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Recalculation failed: {str(e)}")
+
 
 # Calculation Details Endpoints
 @router.get("/calculations/electricity")

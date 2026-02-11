@@ -14,7 +14,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router';
-import { Plus, RotateCcw } from 'lucide-react';
+import { Plus, RotateCcw, Settings } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import {
@@ -480,9 +480,18 @@ export default function Dashboard() {
     <div className="dashboard-container min-h-screen bg-gray-50">
       {/* Page Header */}
       <header className="bg-white px-4 sm:px-6 lg:px-8 py-4 shadow-sm mb-6">
-        <h1 className="text-xl font-bold text-indigo-600 tracking-tight">
-          Energy Tracker
-        </h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-bold text-indigo-600 tracking-tight">
+            Energy Tracker
+          </h1>
+          <button
+            onClick={() => navigate('/settings')}
+            className="inline-flex items-center p-1.5 mr-2 hover:bg-indigo-200 text-indigo-700 font-medium text-sm rounded-full transition-colors"
+            title="Settings"
+          >
+            <Settings className="w-6 h-6" />
+          </button>
+        </div>
       </header>
 
       <main className="px-4 sm:px-6 lg:px-8 pb-8">

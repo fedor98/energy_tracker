@@ -1,4 +1,5 @@
 import sqlite3
+import datetime
 import json
 import os
 from typing import List, Optional, Dict, Any
@@ -375,6 +376,94 @@ def _calculate_gas_consumption(conn, room: str, date: str):
     ''', (period, room, meter_id, consumption, calc_details_json))
     
     conn.commit()
+
+def recalculate_all_consumption():
+    """
+    Recalculate all consumption calculations for all meters/rooms and all periods.
+    Clears the consumption_calc table and recalculates everything from scratch.
+    Returns statistics about the recalculation.
+    """
+    conn = get_db_connection()
+    c = conn.cursor()
+    
+    try:
+        # Clear all existing calculations
+        c.execute('DELETE FROM consumption_calc')
+        
+        stats = {
+            'electricity': 0,
+            'water_warm': 0,
+            'water_cold': 0,
+            'gas': 0,
+            'total': 0
+        }
+        
+        # Get all unique electricity meter/period combinations
+        c.execute('''
+            SELECT DISTINCT meter_name, SUBSTR(date, 1, 7) as period
+            FROM readings_electricity
+            ORDER BY period, meter_name
+        ''')
+        electricity_combinations = c.fetchall()
+        
+        # Recalculate electricity for each meter/period
+        for row in electricity_combinations:
+            meter_name = row['meter_name']
+            period = row['period']
+            # Use first day of period for calculation
+            _calculate_electricity_consumption(conn, meter_name, f"{period}-01")
+            stats['electricity'] += 1
+            stats['total'] += 1
+        
+        # Get all unique water room/type/period combinations
+        c.execute('''
+            SELECT DISTINCT room, is_warm_water, SUBSTR(date, 1, 7) as period
+            FROM readings_water
+            ORDER BY period, room, is_warm_water
+        ''')
+        water_combinations = c.fetchall()
+        
+        # Recalculate water for each room/type/period
+        for row in water_combinations:
+            room = row['room']
+            is_warm_water = bool(row['is_warm_water'])
+            period = row['period']
+            # Use first day of period for calculation
+            _calculate_water_consumption(conn, room, f"{period}-01", is_warm_water)
+            if is_warm_water:
+                stats['water_warm'] += 1
+            else:
+                stats['water_cold'] += 1
+            stats['total'] += 1
+        
+        # Get all unique gas room/period combinations
+        c.execute('''
+            SELECT DISTINCT room, SUBSTR(date, 1, 7) as period
+            FROM readings_gas
+            ORDER BY period, room
+        ''')
+        gas_combinations = c.fetchall()
+        
+        # Recalculate gas for each room/period
+        for row in gas_combinations:
+            room = row['room']
+            period = row['period']
+            # Use first day of period for calculation
+            _calculate_gas_consumption(conn, room, f"{period}-01")
+            stats['gas'] += 1
+            stats['total'] += 1
+        
+        conn.commit()
+        return {
+            "status": "success",
+            "message": f"Recalculated {stats['total']} consumption entries",
+            "stats": stats
+        }
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
 
 def save_config(config: AppConfig):
     conn = get_db_connection()
@@ -1042,6 +1131,7 @@ def reorganize_tables():
     """
     Reorganize all readings tables to have newest entries first.
     This recreates the tables with DESC ordering to optimize for newest-first queries.
+    All constraints (PRIMARY KEY, NOT NULL, DEFAULT, UNIQUE) are preserved.
     """
     import datetime
     import shutil
@@ -1058,37 +1148,101 @@ def reorganize_tables():
     c = conn.cursor()
 
     try:
-        # Reorganize readings_electricity
+        # Reorganize readings_electricity with full schema (AUTOINCREMENT removed for proper ORDER BY behavior)
         c.execute('''
-            CREATE TABLE readings_electricity_new AS
-            SELECT * FROM readings_electricity
+            CREATE TABLE readings_electricity_new (
+                id INTEGER PRIMARY KEY,
+                date TEXT NOT NULL,
+                meter_name TEXT NOT NULL,
+                meter_id TEXT NOT NULL,
+                value REAL NOT NULL,
+                comment TEXT,
+                is_reset BOOLEAN NOT NULL DEFAULT 0,
+                UNIQUE(date, meter_name, meter_id)
+            )
+        ''')
+        # Insert WITHOUT id column - SQLite will assign sequential IDs in ORDER BY sequence
+        c.execute('''
+            INSERT INTO readings_electricity_new (date, meter_name, meter_id, value, comment, is_reset)
+            SELECT date, meter_name, meter_id, value, comment, 
+                   COALESCE(is_reset, 0) as is_reset
+            FROM readings_electricity
             ORDER BY date DESC, meter_name, meter_id
         ''')
         c.execute('DROP TABLE readings_electricity')
         c.execute('ALTER TABLE readings_electricity_new RENAME TO readings_electricity')
 
-        # Reorganize readings_water
+        # Reorganize readings_water with full schema (AUTOINCREMENT removed for proper ORDER BY behavior)
         c.execute('''
-            CREATE TABLE readings_water_new AS
-            SELECT * FROM readings_water
+            CREATE TABLE readings_water_new (
+                id INTEGER PRIMARY KEY,
+                date TEXT NOT NULL,
+                room TEXT NOT NULL,
+                meter_id TEXT NOT NULL,
+                value REAL NOT NULL,
+                is_warm_water BOOLEAN NOT NULL DEFAULT 0,
+                comment TEXT,
+                is_reset BOOLEAN NOT NULL DEFAULT 0,
+                UNIQUE(date, room, is_warm_water, meter_id)
+            )
+        ''')
+        # Insert WITHOUT id column - SQLite will assign sequential IDs in ORDER BY sequence
+        c.execute('''
+            INSERT INTO readings_water_new (date, room, meter_id, value, is_warm_water, comment, is_reset)
+            SELECT date, room, meter_id, value, 
+                   COALESCE(is_warm_water, 0) as is_warm_water,
+                   comment,
+                   COALESCE(is_reset, 0) as is_reset
+            FROM readings_water
             ORDER BY date DESC, room, is_warm_water, meter_id
         ''')
         c.execute('DROP TABLE readings_water')
         c.execute('ALTER TABLE readings_water_new RENAME TO readings_water')
 
-        # Reorganize readings_gas
+        # Reorganize readings_gas with full schema (AUTOINCREMENT removed for proper ORDER BY behavior)
         c.execute('''
-            CREATE TABLE readings_gas_new AS
-            SELECT * FROM readings_gas
+            CREATE TABLE readings_gas_new (
+                id INTEGER PRIMARY KEY,
+                date TEXT NOT NULL,
+                room TEXT NOT NULL,
+                meter_id TEXT NOT NULL,
+                value REAL NOT NULL,
+                comment TEXT,
+                is_reset BOOLEAN NOT NULL DEFAULT 0,
+                UNIQUE(date, room, meter_id)
+            )
+        ''')
+        # Insert WITHOUT id column - SQLite will assign sequential IDs in ORDER BY sequence
+        c.execute('''
+            INSERT INTO readings_gas_new (date, room, meter_id, value, comment, is_reset)
+            SELECT date, room, meter_id, value, comment,
+                   COALESCE(is_reset, 0) as is_reset
+            FROM readings_gas
             ORDER BY date DESC, room, meter_id
         ''')
         c.execute('DROP TABLE readings_gas')
         c.execute('ALTER TABLE readings_gas_new RENAME TO readings_gas')
 
-        # Reorganize consumption_calc
+        # Reorganize consumption_calc with full schema (AUTOINCREMENT removed for proper ORDER BY behavior)
         c.execute('''
-            CREATE TABLE consumption_calc_new AS
-            SELECT * FROM consumption_calc
+            CREATE TABLE consumption_calc_new (
+                id INTEGER PRIMARY KEY,
+                period TEXT NOT NULL,
+                entity_type TEXT NOT NULL,
+                entity_id TEXT NOT NULL,
+                meter_id TEXT,
+                consumption_value REAL,
+                calculation_details TEXT,
+                calculated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(period, entity_type, entity_id, meter_id)
+            )
+        ''')
+        # Insert WITHOUT id column - SQLite will assign sequential IDs in ORDER BY sequence
+        c.execute('''
+            INSERT INTO consumption_calc_new (period, entity_type, entity_id, meter_id, consumption_value, calculation_details, calculated_at)
+            SELECT period, entity_type, entity_id, meter_id, consumption_value, calculation_details,
+                   COALESCE(calculated_at, CURRENT_TIMESTAMP) as calculated_at
+            FROM consumption_calc
             ORDER BY period DESC, entity_type, entity_id
         ''')
         c.execute('DROP TABLE consumption_calc')
@@ -1117,6 +1271,89 @@ def reorganize_tables():
         raise e
     finally:
         conn.close()
+
+
+def list_backups():
+    """
+    List all available backup files.
+    Returns list of backup files with timestamps.
+    """
+    import glob
+    
+    backup_files = []
+    db_dir = os.path.dirname(DB_PATH)
+    db_name = os.path.basename(DB_PATH)
+    
+    # Pattern for reorganize backups
+    pattern = os.path.join(db_dir, f"{db_name}_reorg_backup_*.sqlite")
+    for backup_path in glob.glob(pattern):
+        filename = os.path.basename(backup_path)
+        # Extract timestamp from filename
+        try:
+            timestamp_str = filename.split('_reorg_backup_')[1].replace('.sqlite', '')
+            # Parse timestamp
+            dt = datetime.datetime.strptime(timestamp_str, "%Y%m%d_%H%M%S")
+            formatted_date = dt.strftime("%Y-%m-%d %H:%M:%S")
+        except:
+            formatted_date = "Unknown"
+        
+        backup_files.append({
+            "filename": filename,
+            "path": backup_path,
+            "created": formatted_date,
+            "size": os.path.getsize(backup_path)
+        })
+    
+    # Sort by creation date (newest first)
+    backup_files.sort(key=lambda x: x["created"], reverse=True)
+    return backup_files
+
+
+def restore_from_backup(backup_path: str):
+    """
+    Restore database from a backup file.
+    Validates the backup file exists and is a valid SQLite database.
+    """
+    import shutil
+    import sqlite3
+    
+    # Validate backup file exists
+    if not os.path.exists(backup_path):
+        raise FileNotFoundError(f"Backup file not found: {backup_path}")
+    
+    # Validate it's a valid SQLite file
+    try:
+        conn = sqlite3.connect(backup_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        tables = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        
+        # Check for essential tables
+        required_tables = ['readings_electricity', 'readings_water', 'readings_gas', 'config']
+        missing_tables = [t for t in required_tables if t not in tables]
+        if missing_tables:
+            raise ValueError(f"Backup is missing required tables: {', '.join(missing_tables)}")
+            
+    except sqlite3.Error as e:
+        raise ValueError(f"Invalid SQLite backup file: {str(e)}")
+    
+    # Create a backup of current database before restoring
+    current_backup = None
+    if os.path.exists(DB_PATH):
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        current_backup = f"{DB_PATH}_pre_restore_backup_{timestamp}.sqlite"
+        shutil.copy2(DB_PATH, current_backup)
+    
+    # Restore from backup
+    shutil.copy2(backup_path, DB_PATH)
+    
+    return {
+        "status": "success", 
+        "message": "Database restored successfully",
+        "restored_from": backup_path,
+        "pre_restore_backup": current_backup
+    }
 
 
 def save_meter_resets(resets: MeterResetsInput) -> Dict[str, Any]:

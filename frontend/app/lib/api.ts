@@ -198,6 +198,43 @@ export interface DeleteReadingsResponse {
   message: string;
 }
 
+export interface ReorganizeResponse {
+  message: string;
+  backup_created?: string;
+}
+
+export interface BackupInfo {
+  filename: string;
+  path: string;
+  created: string;
+  size: number;
+}
+
+export interface BackupsResponse {
+  backups: BackupInfo[];
+}
+
+export interface RestoreResponse {
+  status: string;
+  message: string;
+  restored_from: string;
+  pre_restore_backup: string | null;
+}
+
+export interface RecalculateStats {
+  electricity: number;
+  water_warm: number;
+  water_cold: number;
+  gas: number;
+  total: number;
+}
+
+export interface RecalculateResponse {
+  status: string;
+  message: string;
+  stats: RecalculateStats;
+}
+
 // Configuration API
 export async function getConfig(): Promise<AppConfig | null> {
   const res = await fetch(`${API_BASE}/config`);
@@ -455,5 +492,44 @@ export async function deleteReadingsByDate(
     method: 'DELETE'
   });
   if (!res.ok) throw new Error('Failed to delete readings');
+  return res.json();
+}
+
+// Maintenance API
+export async function reorganizeDatabase(): Promise<ReorganizeResponse> {
+  const res = await fetch(`${API_BASE}/maintenance/reorganize`, {
+    method: 'POST'
+  });
+  if (!res.ok) throw new Error('Failed to reorganize database');
+  return res.json();
+}
+
+export async function listBackups(): Promise<BackupsResponse> {
+  const res = await fetch(`${API_BASE}/maintenance/backups`);
+  if (!res.ok) throw new Error('Failed to list backups');
+  return res.json();
+}
+
+export async function restoreFromBackup(backupPath: string): Promise<RestoreResponse> {
+  const res = await fetch(`${API_BASE}/maintenance/restore`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ backup_path: backupPath })
+  });
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.detail || 'Failed to restore from backup');
+  }
+  return res.json();
+}
+
+export async function recalculateAllConsumption(): Promise<RecalculateResponse> {
+  const res = await fetch(`${API_BASE}/maintenance/recalculate`, {
+    method: 'POST'
+  });
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.detail || 'Failed to recalculate consumption');
+  }
   return res.json();
 }
