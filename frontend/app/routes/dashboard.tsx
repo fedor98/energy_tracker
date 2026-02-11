@@ -15,6 +15,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { Plus, RotateCcw, Settings } from 'lucide-react';
+import {
+  ConsumptionIcon,
+  CalcIcon,
+  ElectricityIcon,
+  WaterIcon,
+  GasIcon,
+} from '../components/icons/MeterIcons';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import {
@@ -39,12 +46,19 @@ import { MeterDataTable } from '../components/MeterDataTable';
 import { DeleteConfirmationDialog } from '../components/DeleteConfirmationDialog';
 
 // Tab configuration for the dashboard - matches original layout
-const DASHBOARD_TABS = [
-  { id: 'consumption', label: 'Consumption 📈', position: 'left' },
-  { id: 'calc', label: 'Calc 🔢', position: 'left' },
-  { id: 'electricity', label: 'Electricity ⚡️', position: 'right' },
-  { id: 'water', label: 'Water 💧', position: 'right' },
-  { id: 'gas', label: 'Gas 💨', position: 'right' },
+interface DashboardTab {
+  id: string;
+  label: string;
+  position: 'left' | 'right';
+  icon: (isActive: boolean) => React.ReactNode;
+}
+
+const DASHBOARD_TABS: DashboardTab[] = [
+  { id: 'consumption', label: 'Consumption', position: 'left', icon: (isActive) => <ConsumptionIcon size={16} className={isActive ? '!text-white' : ''} /> },
+  { id: 'calc', label: 'Calc', position: 'left', icon: (isActive) => <CalcIcon size={16} className={isActive ? '!text-white' : ''} /> },
+  { id: 'electricity', label: 'Electricity', position: 'right', icon: (isActive) => <ElectricityIcon size={16} className={isActive ? '!text-white' : ''} /> },
+  { id: 'water', label: 'Water', position: 'right', icon: (isActive) => <WaterIcon size={16} className={isActive ? '!text-white' : ''} /> },
+  { id: 'gas', label: 'Gas', position: 'right', icon: (isActive) => <GasIcon size={16} className={isActive ? '!text-white' : ''} /> },
 ];
 
 // Skeleton component for loading states
@@ -110,7 +124,10 @@ function DashboardTabs({ activeTab, onChange }: DashboardTabsProps) {
                   : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
               }`}
             >
-              {tab.label}
+              <span className="flex items-center gap-2">
+                {tab.icon(activeTab === tab.id)}
+                {tab.label}
+              </span>
             </button>
           ))}
         </div>
@@ -127,7 +144,9 @@ function DashboardTabs({ activeTab, onChange }: DashboardTabsProps) {
                   : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
               }`}
             >
-              {tab.label.split(' ')[1]}
+              <span className="flex items-center gap-1">
+                {tab.icon(activeTab === tab.id)}
+              </span>
             </button>
           ))}
         </div>
@@ -147,7 +166,10 @@ function DashboardTabs({ activeTab, onChange }: DashboardTabsProps) {
                   : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
               }`}
             >
-              {tab.label}
+              <span className="flex items-center gap-2">
+                {tab.icon(activeTab === tab.id)}
+                {tab.label}
+              </span>
             </button>
           ))}
         </div>
@@ -167,7 +189,10 @@ function DashboardTabs({ activeTab, onChange }: DashboardTabsProps) {
                   : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
               }`}
             >
-              {tab.label}
+              <span className="flex items-center gap-2">
+                {tab.icon(activeTab === tab.id)}
+                {tab.label}
+              </span>
             </button>
           ))}
         </div>

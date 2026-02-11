@@ -12,6 +12,7 @@
  */
 
 import type { CalculationData, CalculationPeriod } from '../lib/api';
+import { ElectricityIcon, WaterIcon, GasIcon } from './icons/MeterIcons';
 
 interface CalculationTablesProps {
   electricityData: CalculationData;
@@ -21,7 +22,7 @@ interface CalculationTablesProps {
 
 interface TableSectionProps {
   title: string;
-  icon: string;
+  icon: React.ReactNode;
   unit: string;
   data: CalculationData;
 }
@@ -54,13 +55,23 @@ function CalcTableSection({ title, icon, unit, data }: TableSectionProps) {
   const meterList = Array.from(allMeters).sort();
 
   /**
-   * Transforms water meter names to use emoji indicators.
+   * Transforms water meter names to use visual indicators.
    * "Room (Warm)" → "🔴 Room"
    * "Room (Cold)" → "🔵 Room"
    */
-  const formatMeterName = (meterName: string): string => {
+  const formatMeterName = (meterName: string): React.ReactNode => {
     if (title === 'Water') {
-      return meterName.replace(' (Warm)', ' 🔴').replace(' (Cold)', ' 🔵');
+      const isWarm = meterName.includes('(Warm)');
+      const isCold = meterName.includes('(Cold)');
+      const baseName = meterName.replace(' (Warm)', '').replace(' (Cold)', '');
+
+      return (
+        <span className="flex items-center gap-1">
+          {isWarm && <span className="inline-block w-2 h-2 rounded-full bg-red-500" />}
+          {isCold && <span className="inline-block w-2 h-2 rounded-full bg-blue-500" />}
+          {baseName}
+        </span>
+      );
     }
     return meterName;
   };
@@ -70,7 +81,7 @@ function CalcTableSection({ title, icon, unit, data }: TableSectionProps) {
 
   return (
     <div className="mb-8 last:mb-0">
-      <h3 className="text-lg font-semibold mb-4 pb-2 border-b-2 border-indigo-600">
+      <h3 className="text-lg font-semibold mb-4 pb-2 border-b-2 border-indigo-600 flex items-center gap-2">
         {icon} {title}
       </h3>
 
@@ -161,14 +172,24 @@ export function CalculationTables({
     <div className="space-y-6">
       <CalcTableSection
         title="Electricity"
-        icon="⚡️"
+        icon={<ElectricityIcon size={20} />}
         unit="kWh"
         data={electricityData}
       />
 
-      <CalcTableSection title="Water" icon="💧" unit="m³" data={waterData} />
+      <CalcTableSection
+        title="Water"
+        icon={<WaterIcon size={20} />}
+        unit="m³"
+        data={waterData}
+      />
 
-      <CalcTableSection title="Gas" icon="💨" unit="m³" data={gasData} />
+      <CalcTableSection
+        title="Gas"
+        icon={<GasIcon size={20} />}
+        unit="m³"
+        data={gasData}
+      />
     </div>
   );
 }

@@ -8,6 +8,7 @@
 import React from 'react';
 import type { MeterConfig, ModeRendererProps } from './types';
 import { getMeterDisplayName, isWaterMeterConfig } from './types';
+import { WarmWaterIndicator, ColdWaterIndicator } from '../icons/MeterIcons';
 
 export function ResetModeRenderer<T extends MeterConfig>({
   meters,
@@ -20,13 +21,11 @@ export function ResetModeRenderer<T extends MeterConfig>({
     
     if (isWaterMeterConfig(meter)) {
       return (
-        <>
-          {displayName}{' '}
-          <span className={meter.is_warm_water ? 'text-red-500' : 'text-blue-500'}>
-            {meter.is_warm_water ? '🔴' : '🔵'}
-          </span>{' '}
+        <span className="flex items-center gap-2">
+          {displayName}
+          {meter.is_warm_water ? <WarmWaterIndicator /> : <ColdWaterIndicator />}
           <span className="text-gray-500 font-normal">({config.unit})</span>
-        </>
+        </span>
       );
     }
     

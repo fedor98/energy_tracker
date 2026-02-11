@@ -32,6 +32,7 @@ import type {
   ReadingUpdateItem
 } from '../lib/api';
 import { getReadingsByDate, updateReadingsByDate } from '../lib/api';
+import { ElectricityIcon, WaterIcon, GasIcon } from '../components/icons/MeterIcons';
 
 type OpenSection = 'electricity' | 'water' | 'gas' | null;
 
@@ -310,7 +311,7 @@ export default function EditRoute() {
             {countReadings('electricity') > 0 && (
               <AccordionSection
                 title="Electricity"
-                icon="⚡"
+                icon={<ElectricityIcon className="w-5 h-5" />}
                 isOpen={openSection === 'electricity'}
                 onToggle={() => toggleSection('electricity')}
                 badge={countReadings('electricity')}
@@ -341,7 +342,7 @@ export default function EditRoute() {
             {countReadings('water') > 0 && (
               <AccordionSection
                 title="Water"
-                icon="💧"
+                icon={<WaterIcon className="w-5 h-5" />}
                 isOpen={openSection === 'water'}
                 onToggle={() => toggleSection('water')}
                 badge={countReadings('water')}
@@ -372,7 +373,7 @@ export default function EditRoute() {
             {countReadings('gas') > 0 && (
               <AccordionSection
                 title="Gas"
-                icon="🔥"
+                icon={<GasIcon className="w-5 h-5" />}
                 isOpen={openSection === 'gas'}
                 onToggle={() => toggleSection('gas')}
                 badge={countReadings('gas')}

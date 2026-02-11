@@ -21,6 +21,7 @@ import { WaterMeterForm } from '../components/WaterMeterForm';
 import { GasMeterForm } from '../components/GasMeterForm';
 import { Toggle } from '../components/Toggle';
 import { initConfig, getConfig, type AppConfig } from '../lib/api';
+import { ElectricityIcon, WaterIcon, GasIcon } from '../components/icons/MeterIcons';
 
 // Track which accordion section is currently open
 type OpenSection = 'electricity' | 'water' | 'gas' | null;
@@ -214,7 +215,7 @@ export default function Setup() {
             {/* Electricity Section */}
             <AccordionSection
               title="Electricity"
-              icon="⚡"
+              icon={<ElectricityIcon className="w-5 h-5" />}
               isOpen={openSection === 'electricity'}
               onToggle={() => toggleSection('electricity')}
               badge={config.electricity.meters.length}
@@ -229,7 +230,7 @@ export default function Setup() {
             {/* Water Section */}
             <AccordionSection
               title="Water"
-              icon="💧"
+              icon={<WaterIcon className="w-5 h-5" />}
               isOpen={openSection === 'water'}
               onToggle={() => toggleSection('water')}
               badge={config.water.meters.length}
@@ -244,7 +245,7 @@ export default function Setup() {
             {/* Gas Section */}
             <AccordionSection
               title="Gas"
-              icon="🔥"
+              icon={<GasIcon className="w-5 h-5" />}
               isOpen={openSection === 'gas'}
               onToggle={() => toggleSection('gas')}
               badge={config.gas.meters.length}

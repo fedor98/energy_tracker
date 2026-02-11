@@ -17,6 +17,7 @@
 
 import type { ElectricityReading, WaterReading, GasReading } from '../lib/api';
 import { TableActionsMenu } from './TableActionsMenu';
+import { WarmWaterIndicator, ColdWaterIndicator } from './icons/MeterIcons';
 
 type MeterData = ElectricityReading | WaterReading | GasReading;
 
@@ -153,8 +154,13 @@ function renderTableRow(
 
     if (type === 'water' && isWaterReading(row)) {
       // Show warm/cold indicator for water
-      const emoji = row.is_warm_water ? '🔴' : '🔵';
-      return `${emoji} ${row.room || '-'}`;
+      const indicator = row.is_warm_water ? <WarmWaterIndicator /> : <ColdWaterIndicator />;
+      return (
+        <span className="flex items-center gap-2">
+          {indicator}
+          {row.room || '-'}
+        </span>
+      );
     }
 
     // Gas uses room field

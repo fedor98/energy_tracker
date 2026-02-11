@@ -10,6 +10,7 @@ import { Toggle } from '../Toggle';
 import type { MeterConfig, SetupModeProps, MeterTypeConfig } from './types';
 import { generateMeterId, getMeterDisplayName, isWaterMeterConfig } from './types';
 import type { GasMeterConfig, WaterMeterConfig, ElectricityMeterConfig } from '../../lib/api';
+import { WarmWaterLabel, ColdWaterLabel } from '../icons/MeterIcons';
 
 export function SetupModeRenderer<T extends MeterConfig>({
   meters,
@@ -74,8 +75,8 @@ export function SetupModeRenderer<T extends MeterConfig>({
           <span className="font-medium text-gray-800">
             {displayName}
             {isWaterMeterConfig(meter) && (
-              <span className={`text-xs ml-1 ${meter.is_warm_water ? 'text-red-500' : 'text-blue-500'}`}>
-                {meter.is_warm_water ? '🔴 Warm' : '🔵 Cold'}
+              <span className="ml-2">
+                {meter.is_warm_water ? <WarmWaterLabel /> : <ColdWaterLabel />}
               </span>
             )}
           </span>

@@ -14,6 +14,7 @@
 import React from 'react';
 import type { ModeRendererProps, MeterConfig, EditData } from './types';
 import { getMeterDisplayName, isWaterMeterConfig } from './types';
+import { WarmWaterLabel, ColdWaterLabel } from '../icons/MeterIcons';
 
 export function EditModeRenderer<T extends MeterConfig>({
   meters,
@@ -60,8 +61,8 @@ export function EditModeRenderer<T extends MeterConfig>({
                   {displayName}
                 </span>
                 {isWaterMeterConfig(meter) && (
-                  <span className={`text-sm ${meter.is_warm_water ? 'text-red-500' : 'text-blue-500'}`}>
-                    {meter.is_warm_water ? '🔴 Warm' : '🔵 Cold'}
+                  <span>
+                    {meter.is_warm_water ? <WarmWaterLabel /> : <ColdWaterLabel />}
                   </span>
                 )}
               </div>

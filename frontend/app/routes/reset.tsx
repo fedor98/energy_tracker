@@ -25,6 +25,7 @@ import { WaterMeterForm } from '../components/WaterMeterForm';
 import { GasMeterForm } from '../components/GasMeterForm';
 import { PageLayout, DateSection, FormFooter } from '../components/accordion-page-layout';
 import { getConfig, saveResets, type AppConfig, type MeterResetsInput } from '../lib/api';
+import { ElectricityIcon, WaterIcon, GasIcon } from '../components/icons/MeterIcons';
 
 type OpenSection = 'electricity' | 'water' | 'gas' | null;
 
@@ -207,7 +208,7 @@ export default function ResetMeter() {
         {/* Electricity Section */}
         <AccordionSection
           title="Electricity"
-          icon="⚡"
+          icon={<ElectricityIcon className="w-5 h-5" />}
           isOpen={openSection === 'electricity'}
           onToggle={() => toggleSection('electricity')}
           badge={countResets('electricity')}
@@ -225,7 +226,7 @@ export default function ResetMeter() {
         {/* Water Section */}
         <AccordionSection
           title="Water"
-          icon="💧"
+          icon={<WaterIcon className="w-5 h-5" />}
           isOpen={openSection === 'water'}
           onToggle={() => toggleSection('water')}
           badge={countResets('water')}
@@ -243,7 +244,7 @@ export default function ResetMeter() {
         {/* Gas Section */}
         <AccordionSection
           title="Gas"
-          icon="🔥"
+          icon={<GasIcon className="w-5 h-5" />}
           isOpen={openSection === 'gas'}
           onToggle={() => toggleSection('gas')}
           badge={countResets('gas')}

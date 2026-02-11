@@ -25,7 +25,8 @@ import {
   Archive,
   RotateCcw as RestoreIcon,
   Trash2,
-  Calculator
+  Calculator,
+  Loader2
 } from 'lucide-react';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -92,16 +93,14 @@ export default function Settings() {
       const result = await reorganizeDatabase();
       setReorganizeStatus({
         type: 'success',
-        message: result.backup_created
-          ? `✓ ${result.message}`
-          : `✓ ${result.message}`
+        message: result.message
       });
       // Reload backups list after reorganization
       await loadBackups();
     } catch (err) {
       setReorganizeStatus({
         type: 'error',
-        message: `✗ ${err instanceof Error ? err.message : 'Failed to reorganize database'}`
+        message: err instanceof Error ? err.message : 'Failed to reorganize database'
       });
     } finally {
       setReorganizing(false);
@@ -121,12 +120,12 @@ export default function Settings() {
       const result = await recalculateAllConsumption();
       setRecalculateStatus({
         type: 'success',
-        message: `✓ ${result.message} (${result.stats.electricity} electricity, ${result.stats.water_warm + result.stats.water_cold} water, ${result.stats.gas} gas entries)`
+        message: `${result.message} (${result.stats.electricity} electricity, ${result.stats.water_warm + result.stats.water_cold} water, ${result.stats.gas} gas entries)`
       });
     } catch (err) {
       setRecalculateStatus({
         type: 'error',
-        message: `✗ ${err instanceof Error ? err.message : 'Failed to recalculate consumption'}`
+        message: err instanceof Error ? err.message : 'Failed to recalculate consumption'
       });
     } finally {
       setRecalculating(false);
@@ -150,7 +149,7 @@ export default function Settings() {
       const result = await restoreFromBackup(selectedBackup.path);
       setRestoreStatus({
         type: 'success',
-        message: `✓ ${result.message}. Reloading...`
+        message: `${result.message}. Reloading...`
       });
       // Reload after short delay
       setTimeout(() => {
@@ -159,7 +158,7 @@ export default function Settings() {
     } catch (err) {
       setRestoreStatus({
         type: 'error',
-        message: `✗ ${err instanceof Error ? err.message : 'Failed to restore from backup'}`
+        message: err instanceof Error ? err.message : 'Failed to restore from backup'
       });
       setRestoring(false);
     }
@@ -185,7 +184,7 @@ export default function Settings() {
       await resetConfig();
       setResetStatus({
         type: 'success',
-        message: '✓ Database reset successfully. Reloading...'
+        message: 'Database reset successfully. Reloading...'
       });
       // Reload after short delay
       setTimeout(() => {
@@ -194,7 +193,7 @@ export default function Settings() {
     } catch (err) {
       setResetStatus({
         type: 'error',
-        message: `✗ ${err instanceof Error ? err.message : 'Failed to reset database'}`
+        message: err instanceof Error ? err.message : 'Failed to reset database'
       });
       setResetting(false);
     }
@@ -256,7 +255,7 @@ export default function Settings() {
           >
             {reorganizing ? (
               <>
-                <span className="animate-spin mr-2">⟳</span>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Creating backup & reorganizing...
               </>
             ) : (
@@ -308,7 +307,7 @@ export default function Settings() {
           >
             {recalculating ? (
               <>
-                <span className="animate-spin mr-2">⟳</span>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Recalculating consumption...
               </>
             ) : (
@@ -441,7 +440,7 @@ export default function Settings() {
           >
             {resetting ? (
               <>
-                <span className="animate-spin mr-2">⟳</span>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 Resetting...
               </>
             ) : (
