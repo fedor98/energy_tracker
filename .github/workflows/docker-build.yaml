@@ -1,0 +1,107 @@
+name: Manual Energy Tracker Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: 'Which part of the version to increment?'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write   # Required for pushing git tags
+  packages: write   # Required for GHCR
+
+concurrency: energy-tracker-build
+
+# Central configuration
+env:
+  IMAGE_NAME: 'energy-tracker'
+  DOCKERFILE: './production/Dockerfile'
+  DOCKER_CONTEXT: './'
+  REGISTRY: ghcr.io
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetches all tags and history for version calculation
+
+      - name: Calculate Next Version
+        id: versioning
+        run: |
+          # 1. Get the latest tag from git (fallback to v0.0.0 if no tags exist)
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          echo "Latest tag found: $LATEST_TAG"
+          
+          # 2. Strip the 'v' prefix
+          VERSION_CLEAN=${LATEST_TAG#v}
+          
+          # 3. Split version into major, minor, patch
+          IFS='.' read -r major minor patch <<< "$VERSION_CLEAN"
+          
+          # 4. Increment version based on user input
+          if [[ "${{ github.event.inputs.bump_type }}" == "major" ]]; then
+            major=$((major + 1))
+            minor=0
+            patch=0
+          elif [[ "${{ github.event.inputs.bump_type }}" == "minor" ]]; then
+            minor=$((minor + 1))
+            patch=0
+          else
+            patch=$((patch + 1))
+          fi
+          
+          NEW_TAG="v$major.$minor.$patch"
+          NEW_VERSION="$major.$minor.$patch"
+          
+          # 5. Set outputs and environment variables
+          echo "NEW_TAG=$NEW_TAG" >> $GITHUB_ENV
+          echo "VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          echo "FULL_IMAGE=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}" >> $GITHUB_ENV
+          
+          echo "Calculated new version: $NEW_TAG"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push git tag
+        run: |
+          # Configure git bot
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Create and push the annotated tag
+          git tag -a "${{ env.NEW_TAG }}" -m "Release ${{ env.NEW_TAG }}"
+          git push origin "${{ env.NEW_TAG }}"
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ env.DOCKER_CONTEXT }}
+          file: ${{ env.DOCKERFILE }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ env.FULL_IMAGE }}:${{ env.VERSION }}
+            ${{ env.FULL_IMAGE }}:latest
+          cache-from: type=registry,ref=${{ env.FULL_IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.FULL_IMAGE }}:buildcache,mode=max
