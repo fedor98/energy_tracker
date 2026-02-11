@@ -38,7 +38,6 @@ from db import (
     delete_water_reading,
     delete_gas_reading,
     get_monthly_readings,
-<<<<<<< HEAD:backend/routes.py
     get_calculation_details_by_type,
     save_meter_resets,
     get_readings_by_date,
@@ -46,9 +45,6 @@ from db import (
     get_meters_for_date,
     update_readings_by_date,
     delete_readings_by_date
-=======
-    get_calculation_details_by_type
->>>>>>> main:app/routes.py
 )
 from migration import migrate_legacy_data, check_migration_needed, get_migration_status
 
@@ -318,7 +314,6 @@ def reorganize_database():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Reorganization failed: {str(e)}")
 
-<<<<<<< HEAD:backend/routes.py
 
 @router.get("/maintenance/backups")
 def get_backups():
@@ -358,8 +353,6 @@ def recalculate_consumption():
         raise HTTPException(status_code=500, detail=f"Recalculation failed: {str(e)}")
 
 
-=======
->>>>>>> main:app/routes.py
 # Calculation Details Endpoints
 @router.get("/calculations/electricity")
 def get_electricity_calculations():
@@ -368,7 +361,6 @@ def get_electricity_calculations():
 
 @router.get("/calculations/water")
 def get_water_calculations():
-<<<<<<< HEAD:backend/routes.py
     """Get water consumption calculations grouped by period.
     
     Returns only warm and cold water consumption per room.
@@ -378,24 +370,11 @@ def get_water_calculations():
     cold_data = get_calculation_details_by_type('water_cold')
     
     # Combine all periods from warm and cold data
-=======
-    """Get water consumption calculations grouped by period."""
-    warm_data = get_calculation_details_by_type('water_warm')
-    cold_data = get_calculation_details_by_type('water_cold')
-    total_data = get_calculation_details_by_type('water_total')
-    
-    # Combine all water types
->>>>>>> main:app/routes.py
     all_periods = set()
     for p in warm_data['periods']:
         all_periods.add(p['period'])
     for p in cold_data['periods']:
         all_periods.add(p['period'])
-<<<<<<< HEAD:backend/routes.py
-=======
-    for p in total_data['periods']:
-        all_periods.add(p['period'])
->>>>>>> main:app/routes.py
     
     # Build result with all meters per period
     result_periods = []
@@ -422,19 +401,6 @@ def get_water_calculations():
                         'segments': m['segments']
                     })
         
-<<<<<<< HEAD:backend/routes.py
-=======
-        # Add total consumption (as separate info)
-        for p in total_data['periods']:
-            if p['period'] == period:
-                for m in p['meters']:
-                    meters.append({
-                        'entity_id': f"{m['entity_id']} (Total)",
-                        'consumption': m['consumption'],
-                        'segments': m['segments']
-                    })
-        
->>>>>>> main:app/routes.py
         result_periods.append({
             'period': period,
             'meters': meters
@@ -446,7 +412,6 @@ def get_water_calculations():
 def get_gas_calculations():
     """Get gas consumption calculations grouped by period."""
     return get_calculation_details_by_type('gas')
-<<<<<<< HEAD:backend/routes.py
 
 # Reset Endpoints
 @router.post("/readings/reset", response_model=ResetResult)
@@ -571,5 +536,3 @@ def delete_readings_for_date(date: str, is_reset: Optional[bool] = Query(None)):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete readings: {str(e)}")
-=======
->>>>>>> main:app/routes.py

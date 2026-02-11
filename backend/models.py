@@ -84,10 +84,7 @@ class WaterReading(WaterReadingInput):
     total_water_consumption: Optional[float] = None
     warm_water_consumption: Optional[float] = None
     cold_water_consumption: Optional[float] = None
-<<<<<<< HEAD:backend/models.py
     is_reset: bool = False
-=======
->>>>>>> main:app/models.py
 
 class GasReadingInput(BaseModel):
     date: str  # YYYY-MM-DD
