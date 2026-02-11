@@ -38,8 +38,19 @@ export function ConsumptionChart({
       chartInstance.current = null;
     }
 
+    // Filter out entries where calculation_details is null/undefined
+    const filteredElectricityData = electricityData.filter(
+      (row) => row.calculation_details !== null && row.calculation_details !== undefined
+    );
+    const filteredGasData = gasData.filter(
+      (row) => row.calculation_details !== null && row.calculation_details !== undefined
+    );
+    const filteredWaterData = waterData.filter(
+      (row) => row.calculation_details !== null && row.calculation_details !== undefined
+    );
+
     // Check if we have any data to display
-    const allData = [...electricityData, ...waterData, ...gasData];
+    const allData = [...filteredElectricityData, ...filteredWaterData, ...filteredGasData];
     if (allData.length === 0) {
       return;
     }
@@ -50,7 +61,7 @@ export function ConsumptionChart({
 
     // Process electricity data - aggregate consumption per period
     const elecByPeriod: Record<string, number> = {};
-    electricityData.forEach((row) => {
+    filteredElectricityData.forEach((row) => {
       if (row.period && row.consumption !== undefined) {
         elecByPeriod[row.period] = (elecByPeriod[row.period] || 0) + row.consumption;
         allPeriods.add(row.period);
@@ -59,7 +70,7 @@ export function ConsumptionChart({
 
     // Process gas data - aggregate consumption per period
     const gasByPeriod: Record<string, number> = {};
-    gasData.forEach((row) => {
+    filteredGasData.forEach((row) => {
       if (row.period && row.consumption !== undefined) {
         gasByPeriod[row.period] = (gasByPeriod[row.period] || 0) + row.consumption;
         allPeriods.add(row.period);
@@ -71,7 +82,7 @@ export function ConsumptionChart({
     const waterWarmByPeriod: Record<string, number> = {};
     const waterColdByPeriod: Record<string, number> = {};
 
-    waterData.forEach((row) => {
+    filteredWaterData.forEach((row) => {
       if (row.period && row.total_water_consumption !== undefined) {
         waterTotalByPeriod[row.period] = (waterTotalByPeriod[row.period] || 0) + row.total_water_consumption;
         allPeriods.add(row.period);
