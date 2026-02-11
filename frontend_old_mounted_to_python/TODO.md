@@ -95,9 +95,13 @@
   - [x] Reset-Einträge markiert mit Badge
   - [x] Integration mit GenericMeterForm (edit mode)
   - [x] Success-Messages und verbesserter Loading-State
-- [ ] **Settings** (`/settings`)
-  - [ ] Config anzeigen
-  - [ ] Reset-Funktion (von Dashboard hierher verschoben)
+- [x] **Settings** (`/settings`)
+  - [x] Database Maintenance: Backup & Reorganize
+  - [x] Recalculate Consumption: Alle Verbrauchswerte neu berechnen
+  - [x] Restore from Backup: Wiederherstellung aus Backups
+  - [x] Danger Zone: App Data Reset (von Dashboard hierher verschoben)
+  - [x] About: Versionsinformationen
+  - [x] Settings-Button im Dashboard Header
 
 ### Phase 4: Edit & Delete Flow ✅
 - [x] **Dashboard Table Actions**

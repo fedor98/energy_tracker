@@ -630,6 +630,117 @@
 
 ---
 
+## 2026-02-11 (Settings Route + Reorganize Fix + Backup/Restore + Recalculate)
+
+### Settings Route Implementation
+**Status:** ✅ Abgeschlossen
+
+**Aktivitäten:**
+- Settings Route erstellt (`frontend/app/routes/settings.tsx`):
+  - Header mit Settings-Titel und "Back to Dashboard" Button
+  - Database Maintenance Section (Backup & Reorganize)
+  - Recalculate Consumption Section (alle Verbräuche neu berechnen)
+  - Restore from Backup Section (Backup-Liste und Restore)
+  - Danger Zone Section (App Data Reset)
+  - About Section (Version-Info)
+
+- Dashboard Header aktualisiert (`frontend/app/routes/dashboard.tsx`):
+  - Settings-Button mit Zahnrad-Icon (Settings/Lucide) rechts vom Titel
+  - Pill-shaped Design (rounded-full) mit grauer Farbe
+  - Navigation zu /settings
+
+**Entscheidungen:**
+- Settings-Button im Header (nicht in Navigation) für schnellen Zugriff
+- Consistentes Card-Layout mit Icons für alle Sections
+- Lucide-React Icons (Settings, Database, Calculator, Archive, etc.)
+
+**Geänderte Dateien:**
+- `frontend/app/routes/settings.tsx` (neu)
+- `frontend/app/routes/dashboard.tsx` (+ Settings Button)
+- `frontend/app/routes.ts` (+ settings route)
+
+---
+
+### Reorganize Tables Fix
+**Status:** ✅ Abgeschlossen
+
+**Problem:**
+- `CREATE TABLE ... AS SELECT ... ORDER BY` in SQLite berücksichtigt AUTOINCREMENT nicht
+- IDs wurden nicht in Sortierreihenfolge vergeben (neueste zuerst)
+
+**Lösung:**
+- `AUTOINCREMENT` aus allen CREATE TABLE Statements entfernt
+- `id` Spalte aus INSERT Statements entfernt
+- SQLite vergibt IDs nun automatisch in ORDER BY Reihenfolge
+- Constraints bleiben erhalten (PRIMARY KEY, NOT NULL, DEFAULT, UNIQUE)
+
+**Ergebnis:**
+- Nach Reorganisation: Neueste Einträge bekommen ID 1, 2, 3...
+- Älteste Einträge bekommen höhere IDs
+- Neue Datensätze bekommen nächste freie ID (keine Wiederverwendung)
+
+**Geänderte Dateien:**
+- `backend/db.py` (reorganize_tables Funktion korrigiert)
+
+---
+
+### Backup & Restore
+**Status:** ✅ Abgeschlossen
+
+**Backend-Funktionen:**
+- `list_backups()` - Listet alle Reorganize-Backups mit Metadaten
+- `restore_from_backup(path)` - Wiederherstellung mit Validierung
+  - Prüft ob Datei existiert
+  - Validiert SQLite Format
+  - Prüft auf notwendige Tabellen
+  - Erstellt automatisch Backup des aktuellen Zustands
+
+**API Endpunkte:**
+- `GET /api/maintenance/backups` - Liste aller Backups
+- `POST /api/maintenance/restore` - Wiederherstellung
+
+**Frontend-Integration:**
+- Backup-Liste mit Dateiname, Erstellungsdatum, Größe
+- "Restore" Button pro Backup
+- Confirmation Dialog mit Backup-Details
+- Formatierung der Dateigröße (Bytes, KB, MB, GB)
+
+**Geänderte Dateien:**
+- `backend/db.py` (+ list_backups, restore_from_backup)
+- `backend/routes.py` (+ Backup/Restore Endpoints)
+- `frontend/app/lib/api.ts` (+ listBackups, restoreFromBackup)
+- `frontend/app/routes/settings.tsx` (+ Restore Section)
+
+---
+
+### Recalculate All Consumption
+**Status:** ✅ Abgeschlossen
+
+**Backend-Funktion:**
+- `recalculate_all_consumption()` - Berechnet alle Verbrauchswerte neu
+  - Löscht alle consumption_calc Einträge
+  - Berechnet Strom für alle Meter/Perioden
+  - Berechnet Wasser (warm/kalt) für alle Räume/Perioden
+  - Berechnet Gas für alle Räume/Perioden
+  - Gibt Statistiken zurück (Anzahl pro Typ)
+
+**API Endpunkt:**
+- `POST /api/maintenance/recalculate` - Startet Neuberechnung
+
+**Frontend-Integration:**
+- "Recalculate All Consumption" Button mit Calculator Icon
+- Loading State während Berechnung
+- Erfolgsmeldung mit Statistiken (Anzahl pro Typ)
+- Fehlermeldung bei Fehlern
+
+**Geänderte Dateien:**
+- `backend/db.py` (+ recalculate_all_consumption)
+- `backend/routes.py` (+ recalculate endpoint)
+- `frontend/app/lib/api.ts` (+ recalculateAllConsumption)
+- `frontend/app/routes/settings.tsx` (+ Recalculate Section)
+
+---
+
 ## Format für neue Einträge
 
 ```markdown

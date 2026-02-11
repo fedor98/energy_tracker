@@ -178,10 +178,52 @@ frontend/app/components/accordion-page-layout/
 - Maximale Konsistenz zwischen allen Formular-Seiten
 - Einfache Wartung (Änderungen an einer Stelle)
 
+### Phase 7: Settings Route ✅ (2026-02-11)
+
+Die `/settings` Route wurde implementiert mit allen Funktionen aus dem Legacy Frontend:
+
+**Settings Page (`frontend/app/routes/settings.tsx`):**
+- **Database Maintenance**: Backup & Reorganize Funktionalität
+  - Korrigierte reorganize_tables() Funktion (Constraints bleiben erhalten)
+  - AUTOINCREMENT entfernt für korrekte ORDER BY Funktionalität
+  - IDs werden neu vergeben nach Sortierung (neueste zuerst)
+- **Recalculate Consumption**: Alle Verbrauchswerte neu berechnen
+  - Löscht alle consumption_calc Einträge
+  - Berechnet Strom, Wasser (warm/kalt), Gas für alle Perioden neu
+  - Zeigt Statistiken (Anzahl pro Typ)
+- **Restore from Backup**: Wiederherstellung aus Backups
+  - Listet alle verfügbaren Reorganize-Backups auf
+  - Zeigt Dateiname, Erstellungsdatum und Größe
+  - Validierung der Backup-Datei vor Restore
+  - Automatisches Backup des aktuellen Zustands vor Wiederherstellung
+- **Danger Zone**: App Data Reset (von Dashboard hierher verschoben)
+  - Erstellt Backup vor dem Reset
+  - Löscht alle Daten und startet Setup-Wizard neu
+- **About**: Versionsinformationen
+
+**Dashboard Header Update:**
+- Settings-Button mit Zahnrad-Icon (Settings/Lucide) hinzugefügt
+- Position: Rechts vom "Energy Tracker" Titel im Header
+- Navigation zu /settings
+
+**Neue API Endpunkte:**
+- `POST /api/maintenance/reorganize` - Tabellen reorganisieren + Backup
+- `GET /api/maintenance/backups` - Liste aller Backups
+- `POST /api/maintenance/restore` - Wiederherstellung aus Backup
+- `POST /api/maintenance/recalculate` - Alle Verbräuche neu berechnen
+
+**Geänderte Dateien:**
+- `frontend/app/routes/settings.tsx` (neu)
+- `frontend/app/routes/dashboard.tsx` (+ Settings Button)
+- `frontend/app/routes.ts` (+ settings route)
+- `frontend/app/lib/api.ts` (+ neue API Funktionen und Interfaces)
+- `backend/db.py` (+ reorganize_tables, list_backups, restore_from_backup, recalculate_all_consumption)
+- `backend/routes.py` (+ neue Maintenance Endpoints)
+
 ### TODOs
 - [x] Edit Reading Route erstellen
 - [x] Delete Flow implementieren
-- [ ] Settings Route erstellen
+- [x] Settings Route erstellen
 
 ## API-Endpunkte (Backend)
 
@@ -218,6 +260,9 @@ frontend/app/components/accordion-page-layout/
 | Methode | Endpoint | Beschreibung |
 |---------|----------|--------------|
 | POST | `/api/maintenance/reorganize` | Tabellen reorganisieren + Backup |
+| GET | `/api/maintenance/backups` | Liste aller verfügbaren Backups |
+| POST | `/api/maintenance/restore` | Wiederherstellung aus Backup |
+| POST | `/api/maintenance/recalculate` | Alle Verbrauchswerte neu berechnen |
 
 ## Models
 
