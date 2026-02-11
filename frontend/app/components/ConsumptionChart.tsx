@@ -92,7 +92,7 @@ export function ConsumptionChart({
       label: 'Electricity (kWh)',
       data: sortedPeriods.map((p) => elecByPeriod[p] || 0),
       borderColor: '#f1c40f',
-      backgroundColor: 'rgba(241, 196, 15, 0.2)',
+      backgroundColor: 'rgba(241, 196, 15, 0.08)',
       tension: 0.1,
       fill: true,
     });
@@ -102,7 +102,7 @@ export function ConsumptionChart({
       label: 'Gas (m³)',
       data: sortedPeriods.map((p) => gasByPeriod[p] || 0),
       borderColor: '#27ae60',
-      backgroundColor: 'rgba(39, 174, 96, 0.2)',
+      backgroundColor: 'rgba(39, 174, 96, 0.08)',
       tension: 0.1,
       fill: true,
     });
@@ -114,7 +114,7 @@ export function ConsumptionChart({
         label: 'Water (m³)',
         data: sortedPeriods.map((p) => waterTotalByPeriod[p] || 0),
         borderColor: '#3498db',
-        backgroundColor: 'rgba(52, 152, 219, 0.2)',
+        backgroundColor: 'rgba(52, 152, 219, 0.08)',
         tension: 0.1,
         fill: true,
       });
@@ -124,7 +124,7 @@ export function ConsumptionChart({
         label: 'Warm Water (m³)',
         data: sortedPeriods.map((p) => waterWarmByPeriod[p] || 0),
         borderColor: '#e74c3c',
-        backgroundColor: 'rgba(231, 76, 60, 0.2)',
+        backgroundColor: 'rgba(231, 76, 60, 0.08)',
         tension: 0.1,
         fill: true,
       });
@@ -133,7 +133,7 @@ export function ConsumptionChart({
         label: 'Cold Water (m³)',
         data: sortedPeriods.map((p) => waterColdByPeriod[p] || 0),
         borderColor: '#3498db',
-        backgroundColor: 'rgba(52, 152, 219, 0.2)',
+        backgroundColor: 'rgba(52, 152, 219, 0.08)',
         tension: 0.1,
         fill: true,
       });
