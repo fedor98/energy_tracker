@@ -1,17 +1,33 @@
 /**
  * TableActionsMenu Component
  *
- * A dropdown menu component for table row actions.
+ * A dropdown menu component for table row actions using React Portal
+ * and Floating UI for robust positioning.
  * Displays a vertical three dots button that opens a popup menu
  * with Edit and Delete options when clicked.
  *
  * Features:
  * - Click outside to close
- * - Smooth animations
+ * - Smart flip and shift positioning with Floating UI
+ * - Smooth scale animation
  * - Accessible keyboard navigation
+ * - Portal-based rendering (always on top)
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
+import {
+  useFloating,
+  useClick,
+  useDismiss,
+  useRole,
+  useInteractions,
+  flip,
+  shift,
+  offset,
+  FloatingFocusManager,
+  FloatingPortal,
+} from '@floating-ui/react';
+import { autoUpdate } from '@floating-ui/dom';
 import { MoreVertical, Edit2, Trash2 } from 'lucide-react';
 
 interface TableActionsMenuProps {
@@ -22,43 +38,34 @@ interface TableActionsMenuProps {
 
 export function TableActionsMenu({ date, onEdit, onDelete }: TableActionsMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
 
-  // Close menu when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(event.target as Node) &&
-        buttonRef.current &&
-        !buttonRef.current.contains(event.target as Node)
-      ) {
-        setIsOpen(false);
-      }
-    }
+  const { refs, floatingStyles, context } = useFloating({
+    open: isOpen,
+    onOpenChange: setIsOpen,
+    placement: 'bottom-end',
+    middleware: [
+      offset(4),
+      flip({
+        fallbackAxisSideDirection: 'end',
+        padding: 8,
+      }),
+      shift({ padding: 8 }),
+    ],
+    whileElementsMounted: (reference, floating, update) => {
+      const cleanup = autoUpdate(reference, floating, update);
+      return cleanup;
+    },
+  });
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
+  const click = useClick(context);
+  const dismiss = useDismiss(context);
+  const role = useRole(context);
 
-  // Close menu on escape key
-  useEffect(() => {
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') {
-        setIsOpen(false);
-      }
-    }
-
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscape);
-      return () => {
-        document.removeEventListener('keydown', handleEscape);
-      };
-    }
-  }, [isOpen]);
+  const { getReferenceProps, getFloatingProps } = useInteractions([
+    click,
+    dismiss,
+    role,
+  ]);
 
   const handleEdit = () => {
     setIsOpen(false);
@@ -71,45 +78,50 @@ export function TableActionsMenu({ date, onEdit, onDelete }: TableActionsMenuPro
   };
 
   return (
-    <div className="relative inline-block text-left" ref={menuRef}>
+    <>
       <button
-        ref={buttonRef}
-        onClick={() => setIsOpen(!isOpen)}
+        ref={refs.setReference}
+        {...getReferenceProps()}
         className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
         aria-label="Open actions menu"
-        aria-expanded={isOpen}
-        aria-haspopup="true"
       >
         <MoreVertical className="w-4 h-4" />
       </button>
-
+      
       {isOpen && (
-        <div
-          className="absolute right-0 z-50 mt-1 w-32 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 origin-top-right animate-in fade-in duration-100"
-          role="menu"
-          aria-orientation="vertical"
-          aria-labelledby="actions-menu"
-        >
-          <div className="py-1" role="none">
-            <button
-              onClick={handleEdit}
-              className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors"
-              role="menuitem"
+        <FloatingPortal>
+          <FloatingFocusManager context={context} modal={false}>
+            <div
+              ref={refs.setFloating}
+              style={{
+                ...floatingStyles,
+                zIndex: 9999,
+              }}
+              {...getFloatingProps()}
+              className="w-32 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 will-change-transform origin-top-right"
             >
-              <Edit2 className="w-4 h-4 mr-2" />
-              Edit
-            </button>
-            <button
-              onClick={handleDelete}
-              className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors"
-              role="menuitem"
-            >
-              <Trash2 className="w-4 h-4 mr-2" />
-              Delete
-            </button>
-          </div>
-        </div>
+              <div className="py-1" role="none">
+                <button
+                  onClick={handleEdit}
+                  className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                  role="menuitem"
+                >
+                  <Edit2 className="w-4 h-4 mr-2" />
+                  Edit
+                </button>
+                <button
+                  onClick={handleDelete}
+                  className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors"
+                  role="menuitem"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete
+                </button>
+              </div>
+            </div>
+          </FloatingFocusManager>
+        </FloatingPortal>
       )}
-    </div>
+    </>
   );
 }
