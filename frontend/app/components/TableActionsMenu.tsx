@@ -98,12 +98,12 @@ export function TableActionsMenu({ date, onEdit, onDelete }: TableActionsMenuPro
                 zIndex: 9999,
               }}
               {...getFloatingProps()}
-              className="w-32 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 will-change-transform origin-top-right"
+              className="w-32 rounded-md shadow-lg bg-white ring-1 ring-gray-200 will-change-transform origin-top-right"
             >
-              <div className="py-1" role="none">
+              <div className="py-1 px-1" role="none">
                 <button
                   onClick={handleEdit}
-                  className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors"
+                  className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 transition-colors rounded-md"
                   role="menuitem"
                 >
                   <Edit2 className="w-4 h-4 mr-2" />
@@ -111,7 +111,7 @@ export function TableActionsMenu({ date, onEdit, onDelete }: TableActionsMenuPro
                 </button>
                 <button
                   onClick={handleDelete}
-                  className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors"
+                  className="flex items-center w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors rounded-md"
                   role="menuitem"
                 >
                   <Trash2 className="w-4 h-4 mr-2" />
