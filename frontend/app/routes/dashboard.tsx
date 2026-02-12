@@ -104,96 +104,50 @@ function DashboardTabs({ activeTab, onChange }: DashboardTabsProps) {
   const leftTabs = DASHBOARD_TABS.filter((t) => t.position === 'left');
   const rightTabs = DASHBOARD_TABS.filter((t) => t.position === 'right');
 
-  // Common button classes for consistent sizing
-  const buttonBaseClasses =
-    'px-4 py-2 font-medium transition-colors rounded-lg text-sm sm:text-base';
+  const TabButton = ({ tab, showLabel = true, flex = false }: { tab: DashboardTab; showLabel?: boolean; flex?: boolean }) => (
+    <button
+      key={tab.id}
+      onClick={() => onChange(tab.id)}
+      className={`px-4 py-2 rounded-lg font-medium text-sm sm:text-base border transition-colors ${
+        activeTab === tab.id
+          ? 'bg-indigo-600 text-white border-indigo-600'
+          : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
+      } ${flex ? 'flex-1' : ''} ${!showLabel ? 'flex items-center justify-center' : ''}`}
+    >
+      <span className={`flex items-center justify-center w-full ${showLabel ? 'gap-2' : ''}`}>
+        {tab.icon(activeTab === tab.id)}
+        {showLabel && tab.label}
+      </span>
+    </button>
+  );
 
   return (
     <div className="flex flex-col gap-2 pb-4">
-      {/* Mobile: Two rows layout */}
+      {/* Mobile */}
       <div className="flex sm:hidden flex-col gap-2">
-        {/* Row 1: Consumption & Calc */}
         <div className="flex gap-2">
           {leftTabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => onChange(tab.id)}
-              className={`${buttonBaseClasses} flex-1 border ${
-                activeTab === tab.id
-                  ? 'bg-indigo-600 text-white border-indigo-600 border-b-0 -mb-[1px] z-10'
-                  : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                {tab.icon(activeTab === tab.id)}
-                {tab.label}
-              </span>
-            </button>
+            <TabButton key={tab.id} tab={tab} showLabel flex />
           ))}
         </div>
-
-        {/* Row 2: Electricity, Water, Gas */}
         <div className="flex gap-2">
           {rightTabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => onChange(tab.id)}
-              className={`${buttonBaseClasses} flex-1 border ${
-                activeTab === tab.id
-                  ? 'bg-indigo-600 text-white border-indigo-600 border-b-0 -mb-[1px] z-10'
-                  : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
-              }`}
-            >
-              <span className="flex items-center gap-1">
-                {tab.icon(activeTab === tab.id)}
-              </span>
-            </button>
+            <TabButton key={tab.id} tab={tab} showLabel={false} flex />
           ))}
         </div>
       </div>
 
-      {/* Desktop: Single row with left/right alignment */}
+      {/* Desktop */}
       <div className="hidden sm:flex flex-row gap-2">
-        {/* Left group */}
         <div className="flex gap-2">
           {leftTabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => onChange(tab.id)}
-              className={`${buttonBaseClasses} border ${
-                activeTab === tab.id
-                  ? 'bg-indigo-600 text-white border-indigo-600 border-b-0 -mb-[1px] z-10'
-                  : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                {tab.icon(activeTab === tab.id)}
-                {tab.label}
-              </span>
-            </button>
+            <TabButton key={tab.id} tab={tab} />
           ))}
         </div>
-
-        {/* Spacer pushes right group to end */}
         <div className="flex-1"></div>
-
-        {/* Right group */}
         <div className="flex gap-2">
           {rightTabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => onChange(tab.id)}
-              className={`${buttonBaseClasses} border ${
-                activeTab === tab.id
-                  ? 'bg-indigo-600 text-white border-indigo-600 border-b-0 -mb-[1px] z-10'
-                  : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
-              }`}
-            >
-              <span className="flex items-center gap-2">
-                {tab.icon(activeTab === tab.id)}
-                {tab.label}
-              </span>
-            </button>
+            <TabButton key={tab.id} tab={tab} />
           ))}
         </div>
       </div>
