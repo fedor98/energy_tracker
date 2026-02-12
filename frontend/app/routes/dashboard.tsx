@@ -177,6 +177,9 @@ export default function Dashboard() {
   // Refs for date picker interactions
   const startMonthRef = useRef<HTMLInputElement>(null);
   const endMonthRef = useRef<HTMLInputElement>(null);
+  
+  // Firefox detection for date input compatibility
+  const isFirefox = typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('firefox');
 
   // Navigation state for active tab
   const [activeTab, setActiveTab] = useState<string>('consumption');
@@ -486,15 +489,35 @@ export default function Dashboard() {
                 Start Month
               </label>
               <div className="relative">
-                <input
-                  type="month"
-                  id="start-month"
-                  ref={startMonthRef}
-                  value={startMonth}
-                  onChange={(e) => setStartMonth(e.target.value)}
-                  className="w-full max-w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none cursor-pointer"
-                  style={{ WebkitAppearance: 'none' }}
-                />
+                {isFirefox ? (
+                  <input
+                    type="date"
+                    id="start-month"
+                    ref={startMonthRef}
+                    value={startMonth ? `${startMonth}-01` : ''}
+                    onChange={(e) => {
+                      const dateValue = e.target.value;
+                      if (dateValue) {
+                        const [year, month] = dateValue.split('-');
+                        setStartMonth(`${year}-${month}`);
+                      } else {
+                        setStartMonth('');
+                      }
+                    }}
+                    className="w-full max-w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none cursor-pointer"
+                    style={{ WebkitAppearance: 'none' }}
+                  />
+                ) : (
+                  <input
+                    type="month"
+                    id="start-month"
+                    ref={startMonthRef}
+                    value={startMonth}
+                    onChange={(e) => setStartMonth(e.target.value)}
+                    className="w-full max-w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none cursor-pointer"
+                    style={{ WebkitAppearance: 'none' }}
+                  />
+                )}
                 <div
                   className="absolute inset-0 cursor-pointer sm:block hidden"
                   onClick={() => startMonthRef.current?.showPicker?.()}
@@ -512,15 +535,35 @@ export default function Dashboard() {
                 End Month
               </label>
               <div className="relative">
-                <input
-                  type="month"
-                  id="end-month"
-                  ref={endMonthRef}
-                  value={endMonth}
-                  onChange={(e) => setEndMonth(e.target.value)}
-                  className="w-full max-w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none cursor-pointer"
-                  style={{ WebkitAppearance: 'none' }}
-                />
+                {isFirefox ? (
+                  <input
+                    type="date"
+                    id="end-month"
+                    ref={endMonthRef}
+                    value={endMonth ? `${endMonth}-01` : ''}
+                    onChange={(e) => {
+                      const dateValue = e.target.value;
+                      if (dateValue) {
+                        const [year, month] = dateValue.split('-');
+                        setEndMonth(`${year}-${month}`);
+                      } else {
+                        setEndMonth('');
+                      }
+                    }}
+                    className="w-full max-w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none cursor-pointer"
+                    style={{ WebkitAppearance: 'none' }}
+                  />
+                ) : (
+                  <input
+                    type="month"
+                    id="end-month"
+                    ref={endMonthRef}
+                    value={endMonth}
+                    onChange={(e) => setEndMonth(e.target.value)}
+                    className="w-full max-w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none cursor-pointer"
+                    style={{ WebkitAppearance: 'none' }}
+                  />
+                )}
                 <div
                   className="absolute inset-0 cursor-pointer sm:block hidden"
                   onClick={() => endMonthRef.current?.showPicker?.()}
