@@ -3,7 +3,6 @@ from typing import List, Optional
 from pydantic import BaseModel
 from models import (
     AppConfig, 
-    ReadingInput, 
     ElectricityReadingInput,
     WaterReadingInput,
     GasReadingInput,
@@ -46,7 +45,6 @@ from db import (
     update_readings_by_date,
     delete_readings_by_date
 )
-from migration import migrate_legacy_data, check_migration_needed, get_migration_status
 
 router = APIRouter()
 
@@ -64,67 +62,6 @@ def init_config(config: AppConfig):
 def reset_app():
     backup_and_reset_db()
     return {"status": "success", "message": "Database reset and backed up"}
-
-# Migration Endpoints
-@router.get("/migration/status")
-def migration_status():
-    return get_migration_status()
-
-@router.post("/migration/run")
-def run_migration():
-    if not check_migration_needed():
-        return {"status": "skipped", "message": "Migration not needed"}
-    
-    try:
-        migrate_legacy_data()
-        return {"status": "success", "message": "Migration completed successfully"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Migration failed: {str(e)}")
-
-@router.post("/readings")
-def add_readings(readings: List[ReadingInput]):
-    """Legacy endpoint - saves readings to appropriate tables."""
-    import sys
-    print(f"DEBUG: Received {len(readings)} readings", flush=True, file=sys.stderr)
-
-    count = 0
-
-    for reading in readings:
-        print(f"DEBUG: Processing: type={reading.type}, meter={reading.meter}, channel={reading.channel}, meter_id={reading.meter_id}, value={reading.value}", flush=True, file=sys.stderr)
-
-        if reading.type == "electricity":
-            date = reading.date or f"{reading.period}-01"
-            save_electricity_reading(ElectricityReadingInput(
-                date=date,
-                meter_name=reading.meter,
-                meter_id=reading.meter_id or 'UNKNOWN',
-                value=reading.value
-            ))
-            count += 1
-        elif reading.type == "water":
-            date = reading.date or f"{reading.period}-01"
-            is_warm = reading.channel == "warm" or reading.channel is None
-
-            save_water_reading(WaterReadingInput(
-                date=date,
-                room=reading.meter,
-                meter_id=reading.meter_id or 'UNKNOWN',
-                value=reading.value,
-                is_warm_water=is_warm
-            ))
-            count += 1
-            print(f"DEBUG: Saved water reading: room={reading.meter}, warm={is_warm}, meter_id={reading.meter_id}, value={reading.value}", flush=True, file=sys.stderr)
-        elif reading.type == "gas":
-            date = reading.date or f"{reading.period}-01"
-            save_gas_reading(GasReadingInput(
-                date=date,
-                room=reading.meter,
-                meter_id=reading.meter_id or 'UNKNOWN',
-                value=reading.value
-            ))
-            count += 1
-
-    return {"status": "success", "count": count}
 
 # Monthly Readings Endpoint
 @router.get("/readings/monthly/{period}", response_model=MonthlyReadings)

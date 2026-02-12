@@ -41,20 +41,7 @@ class AppConfig(BaseModel):
             electricity=ElectricityConfig(meters=[])
         )
 
-# Legacy Reading Model (for compatibility during transition)
-class ReadingInput(BaseModel):
-    period: str  # YYYY-MM
-    date: Optional[str] = None  # YYYY-MM-DD
-    type: Literal["electricity", "water", "gas"]
-    meter: str  # Room name or Meter name
-    channel: Optional[str] = None  # "warm", "cold", or None
-    meter_id: Optional[str] = None  # Zählernummer
-    value: float
-
-class ReadingItem(ReadingInput):
-    id: int
-
-# New Separate Reading Models
+# Reading Models
 class ElectricityReadingInput(BaseModel):
     date: str  # YYYY-MM-DD
     meter_name: str

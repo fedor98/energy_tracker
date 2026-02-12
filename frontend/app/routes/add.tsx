@@ -23,7 +23,7 @@ import { ElectricityMeterForm } from '../components/ElectricityMeterForm';
 import { WaterMeterForm } from '../components/WaterMeterForm';
 import { GasMeterForm } from '../components/GasMeterForm';
 import { PageLayout, DateSection, FormFooter } from '../components/accordion-page-layout';
-import { getConfig, saveReadings, type AppConfig, type ReadingInput } from '../lib/api';
+import { getConfig, createElectricityReading, createWaterReading, createGasReading, type AppConfig, type ElectricityReadingInput, type WaterReadingInput, type GasReadingInput } from '../lib/api';
 import { ElectricityIcon, WaterIcon, GasIcon } from '../components/icons/MeterIcons';
 
 type OpenSection = 'electricity' | 'water' | 'gas' | null;
@@ -107,62 +107,61 @@ export default function AddReading() {
     setSuccessMessage(null);
 
     try {
-      const period = date.slice(0, 7); // YYYY-MM
-      const readingInputs: ReadingInput[] = [];
-
-      // Collect electricity readings
+      // Save electricity readings
+      const electricityPromises: Promise<unknown>[] = [];
       Object.entries(readings.electricity).forEach(([meterId, value]) => {
         if (value.trim()) {
           const meter = config?.electricity.meters.find(m => m.meter_id === meterId);
           if (meter) {
-            readingInputs.push({
-              period,
+            const reading: ElectricityReadingInput = {
               date,
-              type: 'electricity',
-              meter: meter.name,
+              meter_name: meter.name,
               meter_id: meterId,
               value: parseFloat(value)
-            });
+            };
+            electricityPromises.push(createElectricityReading(reading));
           }
         }
       });
 
-      // Collect water readings
+      // Save water readings
+      const waterPromises: Promise<unknown>[] = [];
       Object.entries(readings.water).forEach(([meterId, value]) => {
         if (value.trim()) {
           const meter = config?.water.meters.find(m => m.meter_id === meterId);
           if (meter) {
-            readingInputs.push({
-              period,
+            const reading: WaterReadingInput = {
               date,
-              type: 'water',
-              meter: meter.room,
+              room: meter.room,
               meter_id: meterId,
-              channel: meter.is_warm_water ? 'warm' : 'cold',
-              value: parseFloat(value)
-            });
+              value: parseFloat(value),
+              is_warm_water: meter.is_warm_water
+            };
+            waterPromises.push(createWaterReading(reading));
           }
         }
       });
 
-      // Collect gas readings
+      // Save gas readings
+      const gasPromises: Promise<unknown>[] = [];
       Object.entries(readings.gas).forEach(([meterId, value]) => {
         if (value.trim()) {
           const meter = config?.gas.meters.find(m => m.meter_id === meterId);
           if (meter) {
-            readingInputs.push({
-              period,
+            const reading: GasReadingInput = {
               date,
-              type: 'gas',
-              meter: meter.room,
+              room: meter.room,
               meter_id: meterId,
               value: parseFloat(value)
-            });
+            };
+            gasPromises.push(createGasReading(reading));
           }
         }
       });
 
-      await saveReadings(readingInputs);
+      // Execute all saves in parallel
+      await Promise.all([...electricityPromises, ...waterPromises, ...gasPromises]);
+      
       setSuccessMessage('Readings saved successfully');
       
       // Navigate back to dashboard after a short delay

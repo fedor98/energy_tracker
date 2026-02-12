@@ -70,29 +70,10 @@ export interface AppConfig {
   };
 }
 
-export interface ReadingInput {
-  period: string;
-  date?: string;
-  type: 'electricity' | 'water' | 'gas';
-  meter: string;
-  meter_id?: string;
-  channel?: string;
-  value: number;
-}
-
 export interface ApiResponse {
   status: string;
   message?: string;
   count?: number;
-}
-
-export interface MigrationStatus {
-  legacy_exists: boolean;
-  new_tables_exist: boolean;
-  electricity_count: number;
-  water_count: number;
-  gas_count: number;
-  legacy_count: number;
 }
 
 export interface CalculationMeter {
@@ -267,29 +248,60 @@ export async function resetConfig(): Promise<ApiResponse> {
   return res.json();
 }
 
-// Readings API
-export async function saveReadings(readings: ReadingInput[]): Promise<ApiResponse> {
-  const res = await fetch(`${API_BASE}/readings`, {
+// Individual Reading Input Types
+export interface ElectricityReadingInput {
+  date: string;
+  meter_name: string;
+  meter_id: string;
+  value: number;
+  comment?: string;
+}
+
+export interface WaterReadingInput {
+  date: string;
+  room: string;
+  meter_id: string;
+  value: number;
+  is_warm_water: boolean;
+  comment?: string;
+}
+
+export interface GasReadingInput {
+  date: string;
+  room: string;
+  meter_id: string;
+  value: number;
+  comment?: string;
+}
+
+// Individual Readings API
+export async function createElectricityReading(reading: ElectricityReadingInput): Promise<ElectricityReading> {
+  const res = await fetch(`${API_BASE}/readings/electricity`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(readings)
+    body: JSON.stringify(reading)
   });
-  if (!res.ok) throw new Error('Failed to save readings');
+  if (!res.ok) throw new Error('Failed to create electricity reading');
   return res.json();
 }
 
-// Migration API
-export async function getMigrationStatus(): Promise<MigrationStatus> {
-  const res = await fetch(`${API_BASE}/migration/status`);
-  if (!res.ok) throw new Error('Failed to fetch migration status');
+export async function createWaterReading(reading: WaterReadingInput): Promise<WaterReading> {
+  const res = await fetch(`${API_BASE}/readings/water`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(reading)
+  });
+  if (!res.ok) throw new Error('Failed to create water reading');
   return res.json();
 }
 
-export async function runMigration(): Promise<ApiResponse> {
-  const res = await fetch(`${API_BASE}/migration/run`, {
-    method: 'POST'
+export async function createGasReading(reading: GasReadingInput): Promise<GasReading> {
+  const res = await fetch(`${API_BASE}/readings/gas`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(reading)
   });
-  if (!res.ok) throw new Error('Failed to run migration');
+  if (!res.ok) throw new Error('Failed to create gas reading');
   return res.json();
 }
 
