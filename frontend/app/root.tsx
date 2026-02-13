@@ -11,6 +11,18 @@ import type { Route } from "./+types/root";
 import "./app.css";
 
 export const links: Route.LinksFunction = () => [
+  // Favicon - SVG with PNG fallback
+  { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
+  { rel: "icon", type: "image/png", sizes: "32x32", href: "/favicon-32x32.png" },
+  { rel: "icon", type: "image/png", sizes: "16x16", href: "/favicon-16x16.png" },
+  
+  // Apple Touch Icon (iOS)
+  { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" },
+  
+  // PWA Manifest
+  { rel: "manifest", href: "/manifest.json" },
+  
+  // Preconnect for fonts
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
     rel: "preconnect",
@@ -29,6 +41,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        
+        {/* PWA Theme and Mobile Configuration */}
+        <meta name="theme-color" content="#4f46e5" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="Energy Tracker" />
+        <meta name="application-name" content="Energy Tracker" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        
         <Meta />
         <Links />
       </head>
