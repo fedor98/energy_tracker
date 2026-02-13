@@ -468,7 +468,7 @@ export default function Dashboard() {
           </h1>
           <button
             onClick={() => navigate('/settings')}
-            className="inline-flex items-center p-1.5 mr-2 hover:bg-indigo-200 text-indigo-700 font-medium text-sm rounded-full transition-colors"
+            className="inline-flex items-center h-9 px-3 mr-2 hover:bg-indigo-200 text-indigo-700 font-medium text-sm rounded-full transition-colors"
             title="Settings"
           >
             <Settings className="w-6 h-6" />

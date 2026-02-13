@@ -214,7 +214,7 @@ export default function Settings() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-50 dashboard-container">
       {/* Page Header */}
       <header className="bg-white px-4 sm:px-6 lg:px-8 py-4 shadow-sm mb-6">
         <div className="flex items-center justify-between">
@@ -223,7 +223,7 @@ export default function Settings() {
           </h1>
           <button
             onClick={() => navigate('/')}
-            className="inline-flex items-center gap-2 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-sm rounded-full transition-colors"
+            className="inline-flex items-center gap-2 h-9 px-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-sm rounded-full transition-colors"
           >
             ← Back to Dashboard
           </button>
