@@ -8,10 +8,40 @@
 html,
 body {
   @apply bg-gray-50;
-  
+
   /* Prevent iOS Safari overscroll/bounce effect showing black/white edges */
   overscroll-behavior: none;
   -webkit-overflow-scrolling: touch;
+}
+
+/* Reserve space for scrollbar to prevent layout shift */
+html {
+  scrollbar-gutter: stable;
+}
+
+/* WebKit browsers (Chrome, Safari, Edge) - thin transparent scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.4);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(107, 114, 128, 0.6);
+}
+
+/* Firefox - thin transparent scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.4) transparent;
 }
 
 /* Ensure the root container fills the viewport */
