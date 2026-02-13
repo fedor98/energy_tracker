@@ -113,10 +113,17 @@ jobs:
             git push origin "$NEW_TAG"
           fi
 
-      # Step 3: Create GitHub Release
+      # Step 3: Prepare Release Notes
+      - name: Prepare Release Notes
+        run: |
+          cp .github/workflows/release-template.md /tmp/release-notes.md
+          sed -i "s|{{VERSION}}|${{ env.VERSION }}|g" /tmp/release-notes.md
+          sed -i "s|{{FULL_IMAGE}}|${{ env.FULL_IMAGE }}|g" /tmp/release-notes.md
+
+      # Step 4: Create GitHub Release
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.NEW_TAG }}
           name: Release ${{ env.NEW_TAG }}
-          body_path: .github/workflows/release-template.md
+          body_path: /tmp/release-notes.md

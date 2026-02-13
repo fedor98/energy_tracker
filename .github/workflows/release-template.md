@@ -1,9 +1,9 @@
 ## 🚀 New Deployment
-**Docker Image Version:** `${{ env.VERSION }}`
+**Docker Image Version:** `{{VERSION}}`
 
 **Pull Command:**
 ```bash
-docker pull ${{ env.FULL_IMAGE }}:${{ env.VERSION }}
+docker pull {{FULL_IMAGE}}:{{VERSION}}
 ```
 
 ---
@@ -15,7 +15,7 @@ Quick start with Docker Compose:
 ```yaml
 services:
   app:
-    image: ${{ env.FULL_IMAGE }}:${{ env.VERSION }}
+    image: {{FULL_IMAGE}}:{{VERSION}}
     container_name: energy_tracker-app
     ports:
       - "8080:80"
