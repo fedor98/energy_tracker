@@ -3,18 +3,10 @@
  * 
  * Displays meter readings in a table format with monthly grouping.
  * Supports three utility types: Electricity, Water, and Gas.
- * 
- * Features:
- * - Groups readings by period (month) with visual dividers
- * - Shows date, meter/room name, and value
- * - Water readings include warm/cold indicators (🔴/🔵)
- * - Sorts meters alphabetically within each month
- * - Displays values with 2 decimal precision
- * - Optional actions column with Edit/Delete menu
- * 
- * The table shows readings in reverse chronological order (newest first).
+ * Reset pairs are automatically merged into single rows.
  */
 
+import { RotateCcw } from 'lucide-react';
 import type { ElectricityReading, WaterReading, GasReading } from '../lib/api';
 import { TableActionsMenu } from './TableActionsMenu';
 import { WarmWaterIndicator, ColdWaterIndicator } from './icons/MeterIcons';
@@ -29,94 +21,128 @@ interface MeterDataTableProps {
   onDelete?: (date: string) => void;
 }
 
-/**
- * Type guard to check if a reading is a WaterReading
- */
-function isWaterReading(reading: MeterData): reading is WaterReading {
-  return 'is_warm_water' in reading;
+interface TableRow {
+  id: number;
+  date: string;
+  displayName: string;
+  value: string;
+  period: string;
+  isReset: boolean;
+  isWarmWater?: boolean;
 }
 
-/**
- * Type guard to check if a reading is an ElectricityReading
- */
-function isElectricityReading(reading: MeterData): reading is ElectricityReading {
-  return 'meter_name' in reading;
-}
+const isWaterReading = (r: MeterData): r is WaterReading => 'is_warm_water' in r;
+const isElectricityReading = (r: MeterData): r is ElectricityReading => 'meter_name' in r;
+const getDisplayName = (r: MeterData): string => isElectricityReading(r) ? (r.meter_name || '') : (r.room || '');
+const getDatePart = (d: string): string => d.split(' ')[0];
+const formatValue = (v: number | null | undefined): string => v == null ? '-' : v.toFixed(2);
 
 /**
- * Type guard to check if a reading is a GasReading
+ * Merges reset pairs into single rows. Reset pairs share the same date and meter.
  */
-function isGasReading(reading: MeterData): reading is GasReading {
-  return 'room' in reading && !('is_warm_water' in reading);
-}
+function mergeResetPairs(data: MeterData[]): TableRow[] {
+  const result: TableRow[] = [];
+  const processed = new Set<number>();
+  const unit = data[0] && 'meter_name' in data[0] ? 'kWh' : 'm³';
 
-/**
- * Groups meter readings by their period (YYYY-MM format).
- * Returns an object with periods as keys and arrays of readings as values.
- */
-function groupByPeriod(data: MeterData[]): Record<string, MeterData[]> {
-  const grouped: Record<string, MeterData[]> = {};
+  for (let i = 0; i < data.length; i++) {
+    if (processed.has(i)) continue;
 
-  data.forEach((row) => {
-    const period = row.period || 'Unknown';
-    if (!grouped[period]) {
-      grouped[period] = [];
+    const current = data[i];
+    const currentIsReset = current.is_reset === true;
+    const currentDate = getDatePart(current.date);
+    const currentName = getDisplayName(current);
+
+    if (!currentIsReset) {
+      result.push({
+        id: current.id,
+        date: current.date,
+        displayName: currentName,
+        value: `${formatValue(current.value)} ${unit}`,
+        period: current.period,
+        isReset: false,
+        isWarmWater: isWaterReading(current) ? current.is_warm_water : undefined
+      });
+      processed.add(i);
+      continue;
     }
-    grouped[period].push(row);
-  });
 
-  return grouped;
-}
+    // Look for reset pair
+    let pairFound = false;
+    for (let j = i + 1; j < data.length; j++) {
+      if (processed.has(j)) continue;
+      
+      const other = data[j];
+      if (other.is_reset === true && 
+          getDatePart(other.date) === currentDate && 
+          getDisplayName(other) === currentName) {
+        
+        // Determine old/new by time
+        const currentTime = current.date.includes(' ') ? current.date.split(' ')[1] : '';
+        const otherTime = other.date.includes(' ') ? other.date.split(' ')[1] : '';
+        const [oldVal, newVal] = currentTime <= otherTime 
+          ? [current.value, other.value] 
+          : [other.value, current.value];
 
-/**
- * Sorts meters alphabetically by their display name (room or meter_name).
- * Used to maintain consistent ordering within each month.
- */
-function sortByMeterName(a: MeterData, b: MeterData): number {
-  const nameA = (isElectricityReading(a) ? a.meter_name : a.room) || '';
-  const nameB = (isElectricityReading(b) ? b.meter_name : b.room) || '';
-  return nameA.toLowerCase().localeCompare(nameB.toLowerCase());
-}
+        result.push({
+          id: current.id,
+          date: currentDate,
+          displayName: currentName,
+          value: `${formatValue(oldVal)} ${unit} → ${formatValue(newVal)} ${unit}`,
+          period: current.period,
+          isReset: true,
+          isWarmWater: isWaterReading(current) ? current.is_warm_water : undefined
+        });
+        processed.add(i);
+        processed.add(j);
+        pairFound = true;
+        break;
+      }
+    }
 
-/**
- * Renders the appropriate header columns based on utility type.
- * Electricity: Date | Meter | Value | Actions (optional)
- * Water: Date | Room | Value (with warm/cold indicator) | Actions (optional)
- * Gas: Date | Room | Value | Actions (optional)
- */
-function renderTableHeader(type: 'electricity' | 'water' | 'gas', showActions?: boolean) {
-  const baseHeaderClass =
-    'px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider';
-
-  if (type === 'electricity') {
-    return (
-      <>
-        <th className={baseHeaderClass}>Date</th>
-        <th className={baseHeaderClass}>Meter</th>
-        <th className={`${baseHeaderClass} text-right`}>Value</th>
-        {showActions && <th className={`${baseHeaderClass} w-8`}></th>}
-      </>
-    );
+    // No pair found - add as single reset
+    if (!pairFound) {
+      result.push({
+        id: current.id,
+        date: currentDate,
+        displayName: currentName,
+        value: `${formatValue(current.value)} ${unit}`,
+        period: current.period,
+        isReset: true,
+        isWarmWater: isWaterReading(current) ? current.is_warm_water : undefined
+      });
+      processed.add(i);
+    }
   }
 
-  // Water and Gas both use 'Room' terminology
+  return result;
+}
+
+function groupByPeriod(rows: TableRow[]): Record<string, TableRow[]> {
+  return rows.reduce((acc, row) => {
+    const period = row.period || 'Unknown';
+    acc[period] = acc[period] || [];
+    acc[period].push(row);
+    return acc;
+  }, {} as Record<string, TableRow[]>);
+}
+
+function renderTableHeader(type: 'electricity' | 'water' | 'gas', showActions?: boolean) {
+  const baseHeaderClass = 'px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider';
+  const nameLabel = type === 'electricity' ? 'Meter' : 'Room';
+
   return (
     <>
       <th className={baseHeaderClass}>Date</th>
-      <th className={baseHeaderClass}>Room</th>
+      <th className={baseHeaderClass}>{nameLabel}</th>
       <th className={`${baseHeaderClass} text-right`}>Value</th>
-        {showActions && <th className={`${baseHeaderClass} w-8`}></th>}
+      {showActions && <th className={`${baseHeaderClass} w-8`}></th>}
     </>
   );
 }
 
-/**
- * Renders a single table row for a meter reading.
- * Handles type-specific formatting (electricity meter names vs room names).
- * Water readings include emoji indicators for warm/cold water.
- */
 function renderTableRow(
-  row: MeterData,
+  row: TableRow,
   type: 'electricity' | 'water' | 'gas',
   isFirstInMonth: boolean,
   showActions?: boolean,
@@ -124,104 +150,36 @@ function renderTableRow(
   onDelete?: (date: string) => void
 ) {
   const baseCellClass = 'px-4 py-3 text-sm';
+  const borderClass = isFirstInMonth ? 'border-t-2 border-gray-300' : '';
 
-  // Check if this is a reset entry
-  const isReset = 'is_reset' in row && row.is_reset;
-
-  // Format the value with 2 decimal places and appropriate unit
-  const formatValue = (value: number | null | undefined): string => {
-    if (value === null || value === undefined) return '-';
-    return value.toFixed(2);
-  };
-
-  // Get unit based on type
-  const unit = type === 'electricity' ? 'kWh' : 'm³';
-
-  // Format date: remove time for reset entries
-  const formatDate = (dateStr: string): string => {
-    if (!dateStr) return '-';
-    if (isReset) {
-      return dateStr.split(' ')[0]; // Remove time part for resets
+  const renderName = () => {
+    if (type === 'water') {
+      const indicator = row.isWarmWater ? <WarmWaterIndicator /> : <ColdWaterIndicator />;
+      return <span className="flex items-center gap-2">{indicator}{row.displayName}</span>;
     }
-    return dateStr;
-  };
-
-  // Render meter/room name with type-specific formatting
-  const renderMeterName = () => {
-    if (type === 'electricity' && isElectricityReading(row)) {
-      return row.meter_name || '-';
-    }
-
-    if (type === 'water' && isWaterReading(row)) {
-      // Show warm/cold indicator for water
-      const indicator = row.is_warm_water ? <WarmWaterIndicator /> : <ColdWaterIndicator />;
-      return (
-        <span className="flex items-center gap-2">
-          {indicator}
-          {row.room || '-'}
-        </span>
-      );
-    }
-
-    // Gas uses room field
-    if (isGasReading(row)) {
-      return row.room || '-';
-    }
-    
-    return '-';
-  };
-
-  // Extract just the date part (YYYY-MM-DD) for the actions menu
-  const getDateKey = (dateStr: string): string => {
-    return dateStr.split(' ')[0]; // Remove time part if present
+    return row.displayName;
   };
 
   return (
     <tr className="hover:bg-gray-50 transition-colors">
-      <td
-        className={`${baseCellClass} text-gray-900 whitespace-nowrap ${
-          isFirstInMonth ? 'border-t-2 border-gray-300' : ''
-        }`}
-      >
-        {formatDate(row.date || '')}{isReset ? <span className="text-red-500"> *</span> : ''}
+      <td className={`${baseCellClass} text-gray-900 whitespace-nowrap ${borderClass}`}>
+        {row.date}
+        {row.isReset && <RotateCcw className="w-3 h-3 text-orange-500 inline ml-1" />}
       </td>
-      <td
-        className={`${baseCellClass} text-gray-700 ${
-          isFirstInMonth ? 'border-t-2 border-gray-300' : ''
-        }`}
-      >
-        {renderMeterName()}
+      <td className={`${baseCellClass} text-gray-700 ${borderClass}`}>{renderName()}</td>
+      <td className={`${baseCellClass} text-gray-900 text-right font-medium ${borderClass}`}>
+        {row.isReset && <RotateCcw className="w-3 h-3 text-orange-500 inline mr-1" />}
+        {row.value}
       </td>
-      <td
-        className={`${baseCellClass} text-gray-900 text-right font-medium ${
-          isFirstInMonth ? 'border-t-2 border-gray-300' : ''
-        }`}
-      >
-        {formatValue(row.value)} {unit}{isReset ? <span className="text-red-500"> *</span> : ''}
-      </td>
-      {showActions && (
-        <td
-          className={`${baseCellClass} px-1 text-center ${
-            isFirstInMonth ? 'border-t-2 border-gray-300' : ''
-          }`}
-        >
-          {onEdit && onDelete && (
-            <TableActionsMenu
-              date={getDateKey(row.date)}
-              onEdit={onEdit}
-              onDelete={onDelete}
-            />
-          )}
+      {showActions && onEdit && onDelete && (
+        <td className={`${baseCellClass} px-1 text-center ${borderClass}`}>
+          <TableActionsMenu date={row.date} onEdit={onEdit} onDelete={onDelete} />
         </td>
       )}
     </tr>
   );
 }
 
-/**
- * Main component that renders a data table for meter readings.
- * Organizes data by period with visual separators between months.
- */
 export function MeterDataTable({
   data,
   type,
@@ -229,21 +187,18 @@ export function MeterDataTable({
   onEdit,
   onDelete
 }: MeterDataTableProps) {
-  // Handle empty state
   if (data.length === 0) {
     return (
       <div className="text-center py-12 text-gray-500">
         <p className="text-lg">No {type} readings available</p>
-        <p className="text-sm mt-2">
-          Try adjusting your date filters or add new readings.
-        </p>
+        <p className="text-sm mt-2">Try adjusting your date filters or add new readings.</p>
       </div>
     );
   }
 
-  // Group and sort the data
-  const grouped = groupByPeriod(data);
-  const sortedPeriods = Object.keys(grouped).sort().reverse(); // Newest first
+  const mergedRows = mergeResetPairs(data);
+  const grouped = groupByPeriod(mergedRows);
+  const sortedPeriods = Object.keys(grouped).sort().reverse();
 
   return (
     <div className="overflow-x-auto">
@@ -251,23 +206,14 @@ export function MeterDataTable({
         <thead className="bg-gray-50">
           <tr>{renderTableHeader(type, showActions)}</tr>
         </thead>
-
         <tbody className="divide-y divide-gray-200">
           {sortedPeriods.map((period) => {
-            const periodRows = grouped[period];
-            // Sort meters alphabetically within this period
-            const sortedRows = [...periodRows].sort(sortByMeterName);
-
-            return sortedRows.map((row, index) => {
-              return renderTableRow(
-                row,
-                type,
-                index === 0,
-                showActions,
-                onEdit,
-                onDelete
-              );
-            });
+            const periodRows = grouped[period].sort((a, b) => 
+              a.displayName.toLowerCase().localeCompare(b.displayName.toLowerCase())
+            );
+            return periodRows.map((row, index) => 
+              renderTableRow(row, type, index === 0, showActions, onEdit, onDelete)
+            );
           })}
         </tbody>
       </table>
