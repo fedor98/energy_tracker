@@ -10,7 +10,7 @@ export default defineConfig({
     // This avoids CORS issues and allows using relative URLs like '/api/config'
     proxy: {
       '/api': {
-        target: 'http://backend:8000',
+        target: 'http://backend-dev:8000',
         changeOrigin: true,
         // No pathRewrite needed - backend expects paths like /api/config
       }
