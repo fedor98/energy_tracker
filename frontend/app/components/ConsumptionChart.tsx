@@ -52,47 +52,60 @@ export function ConsumptionChart({
     }
 
     // Process electricity data from CalculationData
+    // Only include periods with valid consumption (not null)
     const elecByPeriod: Record<string, number> = {};
     electricityData.periods.forEach((period) => {
-      const total = period.meters.reduce((sum, m) => sum + (m.consumption || 0), 0);
-      elecByPeriod[period.period] = total;
+      const hasValidConsumption = period.meters.some(m => m.consumption !== null);
+      if (hasValidConsumption) {
+        const total = period.meters.reduce((sum, m) => sum + (m.consumption || 0), 0);
+        elecByPeriod[period.period] = total;
+      }
     });
 
     // Process gas data from CalculationData
+    // Only include periods with valid consumption (not null)
     const gasByPeriod: Record<string, number> = {};
     gasData.periods.forEach((period) => {
-      const total = period.meters.reduce((sum, m) => sum + (m.consumption || 0), 0);
-      gasByPeriod[period.period] = total;
+      const hasValidConsumption = period.meters.some(m => m.consumption !== null);
+      if (hasValidConsumption) {
+        const total = period.meters.reduce((sum, m) => sum + (m.consumption || 0), 0);
+        gasByPeriod[period.period] = total;
+      }
     });
 
     // Process water data from CalculationData
+    // Only include periods with valid consumption (not null)
     const waterTotalByPeriod: Record<string, number> = {};
     const waterWarmByPeriod: Record<string, number> = {};
     const waterColdByPeriod: Record<string, number> = {};
 
     waterData.periods.forEach((period) => {
-      let periodTotal = 0;
-      let periodWarm = 0;
-      let periodCold = 0;
+      const hasValidConsumption = period.meters.some(m => m.consumption !== null);
+      if (hasValidConsumption) {
+        let periodTotal = 0;
+        let periodWarm = 0;
+        let periodCold = 0;
 
-      period.meters.forEach((meter) => {
-        const consumption = meter.consumption || 0;
-        periodTotal += consumption;
+        period.meters.forEach((meter) => {
+          const consumption = meter.consumption || 0;
+          periodTotal += consumption;
 
-        // Check if meter is warm or cold based on entity_id
-        if (meter.entity_id.includes('(Warm)')) {
-          periodWarm += consumption;
-        } else if (meter.entity_id.includes('(Cold)')) {
-          periodCold += consumption;
-        }
-      });
+          // Check if meter is warm or cold based on entity_id
+          if (meter.entity_id.includes('(Warm)')) {
+            periodWarm += consumption;
+          } else if (meter.entity_id.includes('(Cold)')) {
+            periodCold += consumption;
+          }
+        });
 
-      waterTotalByPeriod[period.period] = periodTotal;
-      waterWarmByPeriod[period.period] = periodWarm;
-      waterColdByPeriod[period.period] = periodCold;
+        waterTotalByPeriod[period.period] = periodTotal;
+        waterWarmByPeriod[period.period] = periodWarm;
+        waterColdByPeriod[period.period] = periodCold;
+      }
     });
 
     // Collect all periods from all data types
+    // Only include periods that have at least one valid consumption value
     const allPeriods = new Set<string>();
     Object.keys(elecByPeriod).forEach((p) => allPeriods.add(p));
     Object.keys(gasByPeriod).forEach((p) => allPeriods.add(p));
