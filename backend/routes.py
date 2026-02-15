@@ -292,19 +292,25 @@ def recalculate_consumption():
 
 # Calculation Details Endpoints
 @router.get("/calculations/electricity")
-def get_electricity_calculations():
+def get_electricity_calculations(
+    start: Optional[str] = Query(None, description="Start period (YYYY-MM)"),
+    end: Optional[str] = Query(None, description="End period (YYYY-MM)")
+):
     """Get electricity consumption calculations grouped by period."""
-    return get_calculation_details_by_type('electricity')
+    return get_calculation_details_by_type('electricity', start_period=start, end_period=end)
 
 @router.get("/calculations/water")
-def get_water_calculations():
+def get_water_calculations(
+    start: Optional[str] = Query(None, description="Start period (YYYY-MM)"),
+    end: Optional[str] = Query(None, description="End period (YYYY-MM)")
+):
     """Get water consumption calculations grouped by period.
     
     Returns only warm and cold water consumption per room.
     Total consumption is calculated in the chart view.
     """
-    warm_data = get_calculation_details_by_type('water_warm')
-    cold_data = get_calculation_details_by_type('water_cold')
+    warm_data = get_calculation_details_by_type('water_warm', start_period=start, end_period=end)
+    cold_data = get_calculation_details_by_type('water_cold', start_period=start, end_period=end)
     
     # Combine all periods from warm and cold data
     all_periods = set()
@@ -346,9 +352,12 @@ def get_water_calculations():
     return {'periods': result_periods}
 
 @router.get("/calculations/gas")
-def get_gas_calculations():
+def get_gas_calculations(
+    start: Optional[str] = Query(None, description="Start period (YYYY-MM)"),
+    end: Optional[str] = Query(None, description="End period (YYYY-MM)")
+):
     """Get gas consumption calculations grouped by period."""
-    return get_calculation_details_by_type('gas')
+    return get_calculation_details_by_type('gas', start_period=start, end_period=end)
 
 # Reset Endpoints
 @router.post("/readings/reset", response_model=ResetResult)

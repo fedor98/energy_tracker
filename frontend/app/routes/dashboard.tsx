@@ -245,16 +245,18 @@ export default function Dashboard() {
   }, []);
 
   /**
-   * Fetch meter readings when date filters change
+   * Fetch meter readings and calculation data when date filters change
+   * Calculations are fetched for the chart to ensure correct consumption values (including reset handling)
    */
   useEffect(() => {
     if (!startMonth || !endMonth) return;
 
-    async function fetchReadings() {
+    async function fetchData() {
       setLoadingReadings(true);
       setError(null);
 
       try {
+        // Fetch readings for data tables (Electricity/Water/Gas tabs)
         const [elecData, waterDataResult, gasDataResult] = await Promise.all([
           getElectricityReadings({ start: startMonth, end: endMonth }),
           getWaterReadings({ start: startMonth, end: endMonth }),
@@ -264,6 +266,17 @@ export default function Dashboard() {
         setElectricityData(elecData);
         setWaterData(waterDataResult);
         setGasData(gasDataResult);
+
+        // Fetch calculations for the chart (correct consumption with reset handling)
+        const [elecCalc, waterCalc, gasCalc] = await Promise.all([
+          getElectricityCalculations({ start: startMonth, end: endMonth }),
+          getWaterCalculations({ start: startMonth, end: endMonth }),
+          getGasCalculations({ start: startMonth, end: endMonth }),
+        ]);
+
+        setElecCalcData(elecCalc);
+        setWaterCalcData(waterCalc);
+        setGasCalcData(gasCalc);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch data');
       } finally {
@@ -271,15 +284,20 @@ export default function Dashboard() {
       }
     }
 
-    fetchReadings();
+    fetchData();
   }, [startMonth, endMonth]);
 
   /**
-   * Fetch calculation data only when Calc tab becomes active
+   * Fetch calculation data only when Calc tab becomes active and we don't have data yet
    * This avoids unnecessary API calls for unused tabs
    */
   useEffect(() => {
     if (activeTab !== 'calc') return;
+    
+    // Skip if we already have calculation data (fetched during initial load)
+    if (elecCalcData.periods.length > 0 || waterCalcData.periods.length > 0 || gasCalcData.periods.length > 0) {
+      return;
+    }
 
     async function fetchCalculations() {
       setLoadingCalculations(true);
@@ -287,9 +305,9 @@ export default function Dashboard() {
 
       try {
         const [elecCalc, waterCalc, gasCalc] = await Promise.all([
-          getElectricityCalculations(),
-          getWaterCalculations(),
-          getGasCalculations(),
+          getElectricityCalculations({ start: startMonth, end: endMonth }),
+          getWaterCalculations({ start: startMonth, end: endMonth }),
+          getGasCalculations({ start: startMonth, end: endMonth }),
         ]);
 
         setElecCalcData(elecCalc);
@@ -303,7 +321,7 @@ export default function Dashboard() {
     }
 
     fetchCalculations();
-  }, [activeTab]);
+  }, [activeTab, startMonth, endMonth, elecCalcData.periods.length, waterCalcData.periods.length, gasCalcData.periods.length]);
 
   /**
    * Reset filters to default (last 12 months)
@@ -392,9 +410,9 @@ export default function Dashboard() {
       case 'consumption':
         return (
           <ConsumptionChart
-            electricityData={electricityData}
-            waterData={waterData}
-            gasData={gasData}
+            electricityData={elecCalcData}
+            waterData={waterCalcData}
+            gasData={gasCalcData}
             cumulatedWater={cumulatedWater}
           />
         );

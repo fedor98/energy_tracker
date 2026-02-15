@@ -419,20 +419,35 @@ export async function deleteGasReading(id: number): Promise<ApiResponse> {
 }
 
 // Calculation APIs
-export async function getElectricityCalculations(): Promise<CalculationData> {
-  const res = await fetch(`${API_BASE}/calculations/electricity`);
+export async function getElectricityCalculations(
+  filters: { start?: string; end?: string } = {}
+): Promise<CalculationData> {
+  const query = new URLSearchParams();
+  if (filters.start) query.append('start', filters.start);
+  if (filters.end) query.append('end', filters.end);
+  const res = await fetch(`${API_BASE}/calculations/electricity?${query.toString()}`);
   if (!res.ok) throw new Error('Failed to fetch electricity calculations');
   return res.json();
 }
 
-export async function getWaterCalculations(): Promise<CalculationData> {
-  const res = await fetch(`${API_BASE}/calculations/water`);
+export async function getWaterCalculations(
+  filters: { start?: string; end?: string } = {}
+): Promise<CalculationData> {
+  const query = new URLSearchParams();
+  if (filters.start) query.append('start', filters.start);
+  if (filters.end) query.append('end', filters.end);
+  const res = await fetch(`${API_BASE}/calculations/water?${query.toString()}`);
   if (!res.ok) throw new Error('Failed to fetch water calculations');
   return res.json();
 }
 
-export async function getGasCalculations(): Promise<CalculationData> {
-  const res = await fetch(`${API_BASE}/calculations/gas`);
+export async function getGasCalculations(
+  filters: { start?: string; end?: string } = {}
+): Promise<CalculationData> {
+  const query = new URLSearchParams();
+  if (filters.start) query.append('start', filters.start);
+  if (filters.end) query.append('end', filters.end);
+  const res = await fetch(`${API_BASE}/calculations/gas?${query.toString()}`);
   if (!res.ok) throw new Error('Failed to fetch gas calculations');
   return res.json();
 }

@@ -1077,24 +1077,42 @@ def get_monthly_readings(period: str) -> Dict[str, List[Dict[str, Any]]]:
     }
 
 
-def get_calculation_details_by_type(entity_type: str) -> Dict[str, Any]:
+def get_calculation_details_by_type(
+    entity_type: str,
+    start_period: Optional[str] = None,
+    end_period: Optional[str] = None
+) -> Dict[str, Any]:
     """
     Get calculation details grouped by period for a specific entity type.
     Returns periods with all meters and their consumption/segment counts.
     
     entity_type: 'electricity', 'gas', 'water_warm', or 'water_cold'
+    start_period: Optional start period filter (YYYY-MM format)
+    end_period: Optional end period filter (YYYY-MM format)
     """
     import json
     conn = get_db_connection()
     c = conn.cursor()
     
-    # Get all calculations for this entity type
-    c.execute('''
+    # Build query with optional period filters
+    query = '''
         SELECT period, entity_id, consumption_value, calculation_details
         FROM consumption_calc
         WHERE entity_type = ?
-        ORDER BY period DESC, entity_id
-    ''', (entity_type,))
+    '''
+    params = [entity_type]
+    
+    if start_period:
+        query += ' AND period >= ?'
+        params.append(start_period)
+    
+    if end_period:
+        query += ' AND period <= ?'
+        params.append(end_period)
+    
+    query += ' ORDER BY period DESC, entity_id'
+    
+    c.execute(query, params)
     
     rows = c.fetchall()
     conn.close()

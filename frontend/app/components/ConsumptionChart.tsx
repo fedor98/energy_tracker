@@ -7,17 +7,30 @@
  * 
  * Uses Chart.js for rendering with responsive design.
  * Chart height: 300px on mobile, 400px on desktop.
+ * 
+ * Now uses CalculationData (from calculation APIs) instead of raw readings,
+ * which ensures correct consumption values even with meter resets.
+ * Missing periods between data points are shown with dashed lines.
  */
 
 import { useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
-import type { ElectricityReading, WaterReading, GasReading } from '../lib/api';
+import type { CalculationData } from '../lib/api';
 
 interface ConsumptionChartProps {
-  electricityData: ElectricityReading[];
-  waterData: WaterReading[];
-  gasData: GasReading[];
+  electricityData: CalculationData;
+  waterData: CalculationData;
+  gasData: CalculationData;
   cumulatedWater: boolean;
+}
+
+/**
+ * Calculate the number of months between two period strings (YYYY-MM format)
+ */
+function monthDiff(period1: string, period2: string): number {
+  const [year1, month1] = period1.split('-').map(Number);
+  const [year2, month2] = period2.split('-').map(Number);
+  return Math.abs((year2 - year1) * 12 + (month2 - month1));
 }
 
 export function ConsumptionChart({
@@ -38,84 +51,100 @@ export function ConsumptionChart({
       chartInstance.current = null;
     }
 
-    // Filter out entries where calculation_details is null/undefined
-    const filteredElectricityData = electricityData.filter(
-      (row) => row.calculation_details !== null && row.calculation_details !== undefined
-    );
-    const filteredGasData = gasData.filter(
-      (row) => row.calculation_details !== null && row.calculation_details !== undefined
-    );
-    const filteredWaterData = waterData.filter(
-      (row) => row.calculation_details !== null && row.calculation_details !== undefined
-    );
-
-    // Check if we have any data to display
-    const allData = [...filteredElectricityData, ...filteredWaterData, ...filteredGasData];
-    if (allData.length === 0) {
-      return;
-    }
-
-    // Prepare datasets for the chart
-    const datasets: any[] = [];
-    const allPeriods = new Set<string>();
-
-    // Process electricity data - aggregate consumption per period
+    // Process electricity data from CalculationData
     const elecByPeriod: Record<string, number> = {};
-    filteredElectricityData.forEach((row) => {
-      if (row.period && row.consumption !== undefined) {
-        elecByPeriod[row.period] = (elecByPeriod[row.period] || 0) + row.consumption;
-        allPeriods.add(row.period);
-      }
+    electricityData.periods.forEach((period) => {
+      const total = period.meters.reduce((sum, m) => sum + (m.consumption || 0), 0);
+      elecByPeriod[period.period] = total;
     });
 
-    // Process gas data - aggregate consumption per period
+    // Process gas data from CalculationData
     const gasByPeriod: Record<string, number> = {};
-    filteredGasData.forEach((row) => {
-      if (row.period && row.consumption !== undefined) {
-        gasByPeriod[row.period] = (gasByPeriod[row.period] || 0) + row.consumption;
-        allPeriods.add(row.period);
-      }
+    gasData.periods.forEach((period) => {
+      const total = period.meters.reduce((sum, m) => sum + (m.consumption || 0), 0);
+      gasByPeriod[period.period] = total;
     });
 
-    // Process water data - either cumulated or split by warm/cold
+    // Process water data from CalculationData
     const waterTotalByPeriod: Record<string, number> = {};
     const waterWarmByPeriod: Record<string, number> = {};
     const waterColdByPeriod: Record<string, number> = {};
 
-    filteredWaterData.forEach((row) => {
-      if (row.period && row.total_water_consumption !== undefined) {
-        waterTotalByPeriod[row.period] = (waterTotalByPeriod[row.period] || 0) + row.total_water_consumption;
-        allPeriods.add(row.period);
+    waterData.periods.forEach((period) => {
+      let periodTotal = 0;
+      let periodWarm = 0;
+      let periodCold = 0;
 
-        if (row.is_warm_water) {
-          waterWarmByPeriod[row.period] = (waterWarmByPeriod[row.period] || 0) + row.total_water_consumption;
-        } else {
-          waterColdByPeriod[row.period] = (waterColdByPeriod[row.period] || 0) + row.total_water_consumption;
+      period.meters.forEach((meter) => {
+        const consumption = meter.consumption || 0;
+        periodTotal += consumption;
+
+        // Check if meter is warm or cold based on entity_id
+        if (meter.entity_id.includes('(Warm)')) {
+          periodWarm += consumption;
+        } else if (meter.entity_id.includes('(Cold)')) {
+          periodCold += consumption;
         }
-      }
+      });
+
+      waterTotalByPeriod[period.period] = periodTotal;
+      waterWarmByPeriod[period.period] = periodWarm;
+      waterColdByPeriod[period.period] = periodCold;
     });
+
+    // Collect all periods from all data types
+    const allPeriods = new Set<string>();
+    Object.keys(elecByPeriod).forEach((p) => allPeriods.add(p));
+    Object.keys(gasByPeriod).forEach((p) => allPeriods.add(p));
+    Object.keys(waterTotalByPeriod).forEach((p) => allPeriods.add(p));
+
+    // Check if we have any data to display
+    if (allPeriods.size === 0) {
+      return;
+    }
 
     // Sort periods chronologically
     const sortedPeriods = Array.from(allPeriods).sort();
 
+    // Helper function to create segment styling for dashed lines between gaps
+    const createSegmentConfig = (periods: string[]) => ({
+      borderDash: (ctx: any) => {
+        if (ctx.p0DataIndex === undefined || ctx.p1DataIndex === undefined) {
+          return undefined;
+        }
+        const prevPeriod = periods[ctx.p0DataIndex];
+        const currentPeriod = periods[ctx.p1DataIndex];
+        if (prevPeriod && currentPeriod) {
+          const diff = monthDiff(prevPeriod, currentPeriod);
+          return diff > 1 ? [5, 5] : undefined;
+        }
+        return undefined;
+      },
+    });
+
+    // Prepare datasets for the chart
+    const datasets: any[] = [];
+
     // Add Electricity dataset (yellow line)
     datasets.push({
       label: 'Electricity (kWh)',
-      data: sortedPeriods.map((p) => elecByPeriod[p] || 0),
+      data: sortedPeriods.map((p) => elecByPeriod[p] ?? null),
       borderColor: '#f1c40f',
       backgroundColor: 'rgba(241, 196, 15, 0.08)',
       tension: 0.1,
       fill: true,
+      segment: createSegmentConfig(sortedPeriods),
     });
 
     // Add Gas dataset (green line)
     datasets.push({
       label: 'Gas (m³)',
-      data: sortedPeriods.map((p) => gasByPeriod[p] || 0),
+      data: sortedPeriods.map((p) => gasByPeriod[p] ?? null),
       borderColor: '#27ae60',
       backgroundColor: 'rgba(39, 174, 96, 0.08)',
       tension: 0.1,
       fill: true,
+      segment: createSegmentConfig(sortedPeriods),
     });
 
     // Add Water dataset(s)
@@ -123,30 +152,33 @@ export function ConsumptionChart({
       // Single line for total water consumption
       datasets.push({
         label: 'Water (m³)',
-        data: sortedPeriods.map((p) => waterTotalByPeriod[p] || 0),
+        data: sortedPeriods.map((p) => waterTotalByPeriod[p] ?? null),
         borderColor: '#3498db',
         backgroundColor: 'rgba(52, 152, 219, 0.08)',
         tension: 0.1,
         fill: true,
+        segment: createSegmentConfig(sortedPeriods),
       });
     } else {
       // Split into warm and cold water
       datasets.push({
         label: 'Warm Water (m³)',
-        data: sortedPeriods.map((p) => waterWarmByPeriod[p] || 0),
+        data: sortedPeriods.map((p) => waterWarmByPeriod[p] ?? null),
         borderColor: '#e74c3c',
         backgroundColor: 'rgba(231, 76, 60, 0.08)',
         tension: 0.1,
         fill: true,
+        segment: createSegmentConfig(sortedPeriods),
       });
 
       datasets.push({
         label: 'Cold Water (m³)',
-        data: sortedPeriods.map((p) => waterColdByPeriod[p] || 0),
+        data: sortedPeriods.map((p) => waterColdByPeriod[p] ?? null),
         borderColor: '#3498db',
         backgroundColor: 'rgba(52, 152, 219, 0.08)',
         tension: 0.1,
         fill: true,
+        segment: createSegmentConfig(sortedPeriods),
       });
     }
 
@@ -200,6 +232,7 @@ export function ConsumptionChart({
             axis: 'x',
             intersect: false,
           },
+          spanGaps: true, // Allow gaps in the line for missing periods
         },
       });
     }
@@ -214,7 +247,10 @@ export function ConsumptionChart({
   }, [electricityData, waterData, gasData, cumulatedWater]);
 
   // Show empty state if no data
-  const hasData = electricityData.length > 0 || waterData.length > 0 || gasData.length > 0;
+  const hasData = 
+    electricityData.periods.length > 0 || 
+    waterData.periods.length > 0 || 
+    gasData.periods.length > 0;
 
   if (!hasData) {
     return (
