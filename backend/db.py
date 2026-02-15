@@ -133,21 +133,33 @@ def init_db():
 def _calculate_consumption_from_readings(readings: List[Dict[str, Any]]) -> tuple:
     """
     Calculate consumption from a list of readings.
-    Returns (total_consumption, calculation_details_dict, segment_count)
+    Returns (total_consumption, calculation_details_dict, readings_count, segment_count)
     
-    Each reading should have: date, value, comment
+    Each reading should have: date, value, comment, is_reset
     """
     import json
     
     if len(readings) < 2:
-        return None, None, 0
+        return None, None, 0, 0
+    
+    # Handle month starting with reset: remove pre-reset reading (first reading if it's is_reset=1)
+    # This is the "Pre-reset reading (last value before meter replacement)"
+    filtered_readings = readings.copy()
+    if len(filtered_readings) > 0 and filtered_readings[0].get('is_reset', 0) == 1:
+        # Check if this looks like a pre-reset reading by examining the comment
+        comment = filtered_readings[0].get('comment', '') or ''
+        if 'Pre-reset' in comment or 'last value before' in comment:
+            filtered_readings = filtered_readings[1:]
+    
+    if len(filtered_readings) < 2:
+        return None, None, 0, 0
     
     segments = []
     total_consumption = 0.0
-    segment_count = 0
+    readings_count = len(filtered_readings)
     
     # Build segments list with all readings
-    for reading in readings:
+    for reading in filtered_readings:
         comment_val = reading['comment'] if 'comment' in reading.keys() else ''
         segments.append({
             "date": reading['date'],
@@ -156,9 +168,9 @@ def _calculate_consumption_from_readings(readings: List[Dict[str, Any]]) -> tupl
         })
     
     # Calculate consumption for each consecutive pair
-    for i in range(len(readings) - 1):
-        current_value = readings[i]['value']
-        next_value = readings[i + 1]['value']
+    for i in range(len(filtered_readings) - 1):
+        current_value = filtered_readings[i]['value']
+        next_value = filtered_readings[i + 1]['value']
         
         diff = next_value - current_value
         
@@ -169,17 +181,20 @@ def _calculate_consumption_from_readings(readings: List[Dict[str, Any]]) -> tupl
             consumption = diff
         
         total_consumption += consumption
-        segment_count += 1
+    
+    # segment_count is readings_count / 2 (each segment is a pair of readings)
+    segment_count = readings_count // 2
     
     calculation_details = {
         "segments": segments,
         "total_consumption": total_consumption,
+        "readings_count": readings_count,
         "segment_count": segment_count,
-        "first_reading_date": readings[0]['date'],
-        "last_reading_date": readings[-1]['date']
+        "first_reading_date": filtered_readings[0]['date'],
+        "last_reading_date": filtered_readings[-1]['date']
     }
     
-    return total_consumption, calculation_details, segment_count
+    return total_consumption, calculation_details, readings_count, segment_count
 
 
 def _calculate_electricity_consumption(conn, meter_name: str, date: str):
@@ -205,7 +220,7 @@ def _calculate_electricity_consumption(conn, meter_name: str, date: str):
     
     # Get all readings for the period
     c.execute('''
-        SELECT date, value, comment FROM readings_electricity 
+        SELECT date, value, comment, is_reset FROM readings_electricity 
         WHERE meter_name = ? AND SUBSTR(date, 1, 7) = ?
         ORDER BY date ASC
     ''', (meter_name, period))
@@ -217,19 +232,20 @@ def _calculate_electricity_consumption(conn, meter_name: str, date: str):
     
     # Get first reading of next period (needed for last segment calculation)
     c.execute('''
-        SELECT date, value, comment FROM readings_electricity 
+        SELECT date, value, comment, is_reset FROM readings_electricity 
         WHERE meter_name = ? AND date >= ?
         ORDER BY date ASC LIMIT 1
     ''', (meter_name, f"{period}-32"))  # Day 32 ensures we're in next month
     next_period_reading = c.fetchone()
     
     # Combine readings: period readings + next period's first reading
-    all_readings = list(period_readings)
+    # Convert sqlite3.Row objects to dicts for easier handling
+    all_readings = [dict(row) for row in period_readings]
     if next_period_reading:
-        all_readings.append(next_period_reading)
+        all_readings.append(dict(next_period_reading))
     
     # Calculate consumption
-    consumption, calc_details, segment_count = _calculate_consumption_from_readings(all_readings)
+    consumption, calc_details, readings_count, segment_count = _calculate_consumption_from_readings(all_readings)
     
     # Insert calculation result
     calc_details_json = json.dumps(calc_details) if calc_details else None
@@ -278,7 +294,7 @@ def _calculate_water_consumption(conn, room: str, date: str, is_warm_water = Non
         
         # Get all readings for the period and type
         c.execute('''
-            SELECT date, value, comment FROM readings_water 
+            SELECT date, value, comment, is_reset FROM readings_water 
             WHERE room = ? AND is_warm_water = ? AND SUBSTR(date, 1, 7) = ?
             ORDER BY date ASC
         ''', (room, is_warm, period))
@@ -289,23 +305,25 @@ def _calculate_water_consumption(conn, room: str, date: str, is_warm_water = Non
         
         # Get first reading of next period
         c.execute('''
-            SELECT date, value, comment FROM readings_water 
+            SELECT date, value, comment, is_reset FROM readings_water 
             WHERE room = ? AND is_warm_water = ? AND date >= ?
             ORDER BY date ASC LIMIT 1
         ''', (room, is_warm, f"{period}-32"))
         next_period_reading = c.fetchone()
         
         # Build readings list
-        all_readings = list(period_readings)
+        # Convert sqlite3.Row objects to dicts for easier handling
+        all_readings = [dict(row) for row in period_readings]
         if next_period_reading:
             all_readings.append({
                 'date': next_period_reading['date'],
                 'value': next_period_reading['value'],
-                'comment': next_period_reading['comment'] or ''
+                'comment': next_period_reading['comment'] or '',
+                'is_reset': next_period_reading['is_reset']
             })
         
         # Calculate consumption
-        consumption, calc_details, _ = _calculate_consumption_from_readings(all_readings)
+        consumption, calc_details, readings_count, segment_count = _calculate_consumption_from_readings(all_readings)
         
         # Insert calculation result
         calc_details_json = json.dumps(calc_details) if calc_details else None
@@ -342,7 +360,7 @@ def _calculate_gas_consumption(conn, room: str, date: str):
     
     # Get all readings for the period
     c.execute('''
-        SELECT date, value, comment FROM readings_gas 
+        SELECT date, value, comment, is_reset FROM readings_gas 
         WHERE room = ? AND SUBSTR(date, 1, 7) = ?
         ORDER BY date ASC
     ''', (room, period))
@@ -354,19 +372,20 @@ def _calculate_gas_consumption(conn, room: str, date: str):
     
     # Get first reading of next period
     c.execute('''
-        SELECT date, value, comment FROM readings_gas 
+        SELECT date, value, comment, is_reset FROM readings_gas 
         WHERE room = ? AND date >= ?
         ORDER BY date ASC LIMIT 1
     ''', (room, f"{period}-32"))
     next_period_reading = c.fetchone()
     
     # Combine readings
-    all_readings = list(period_readings)
+    # Convert sqlite3.Row objects to dicts for easier handling
+    all_readings = [dict(row) for row in period_readings]
     if next_period_reading:
-        all_readings.append(next_period_reading)
+        all_readings.append(dict(next_period_reading))
     
     # Calculate consumption
-    consumption, calc_details, segment_count = _calculate_consumption_from_readings(all_readings)
+    consumption, calc_details, readings_count, segment_count = _calculate_consumption_from_readings(all_readings)
     
     # Insert calculation result
     calc_details_json = json.dumps(calc_details) if calc_details else None
@@ -1087,19 +1106,22 @@ def get_calculation_details_by_type(entity_type: str) -> Dict[str, Any]:
         if period not in periods:
             periods[period] = []
         
-        # Parse calculation_details to get segment count
+        # Parse calculation_details to get segment count and readings count
         segment_count = 0
+        readings_count = 0
         if row['calculation_details']:
             try:
                 calc_details = json.loads(row['calculation_details'])
                 segment_count = calc_details.get('segment_count', 0)
+                readings_count = calc_details.get('readings_count', 0)
             except:
                 pass
         
         periods[period].append({
             'entity_id': row['entity_id'],
             'consumption': row['consumption_value'],
-            'segments': segment_count
+            'segments': segment_count,
+            'readings_count': readings_count
         })
     
     # Convert to sorted list
