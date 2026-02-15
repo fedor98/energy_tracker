@@ -91,13 +91,6 @@ class MeterSummary(BaseModel):
     type: str
     consumption: float
 
-# New Monthly Readings Response Model
-class MonthlyReadings(BaseModel):
-    period: str
-    electricity: List[ElectricityReading]
-    water: List[WaterReading]
-    gas: List[GasReading]
-
 # Consumption Calculation Models
 class SegmentItem(BaseModel):
     date: str

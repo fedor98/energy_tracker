@@ -305,13 +305,6 @@ export async function createGasReading(reading: GasReadingInput): Promise<GasRea
   return res.json();
 }
 
-// Monthly Readings API
-export async function getMonthlyReadings(period: string): Promise<{ period: string; electricity: ElectricityReading[]; water: WaterReading[]; gas: GasReading[] }> {
-  const res = await fetch(`${API_BASE}/readings/monthly/${period}`);
-  if (!res.ok) throw new Error('Failed to fetch monthly readings');
-  return res.json();
-}
-
 // Electricity API
 export async function getElectricityReadings(filters: { start?: string; end?: string; meter?: string } = {}): Promise<ElectricityReading[]> {
   const query = new URLSearchParams();
@@ -320,12 +313,6 @@ export async function getElectricityReadings(filters: { start?: string; end?: st
   if (filters.meter) query.append('meter', filters.meter);
   const res = await fetch(`${API_BASE}/readings/electricity?${query.toString()}`);
   if (!res.ok) throw new Error('Failed to fetch electricity readings');
-  return res.json();
-}
-
-export async function getElectricityReading(id: number): Promise<ElectricityReading> {
-  const res = await fetch(`${API_BASE}/readings/electricity/${id}`);
-  if (!res.ok) throw new Error('Failed to fetch electricity reading');
   return res.json();
 }
 
@@ -359,12 +346,6 @@ export async function getWaterReadings(filters: { start?: string; end?: string; 
   return res.json();
 }
 
-export async function getWaterReading(id: number): Promise<WaterReading> {
-  const res = await fetch(`${API_BASE}/readings/water/${id}`);
-  if (!res.ok) throw new Error('Failed to fetch water reading');
-  return res.json();
-}
-
 export async function updateWaterReading(id: number, reading: { value: number; comment?: string; date?: string }): Promise<WaterReading> {
   const res = await fetch(`${API_BASE}/readings/water/${id}`, {
     method: 'PUT',
@@ -391,12 +372,6 @@ export async function getGasReadings(filters: { start?: string; end?: string; ro
   if (filters.room) query.append('room', filters.room);
   const res = await fetch(`${API_BASE}/readings/gas?${query.toString()}`);
   if (!res.ok) throw new Error('Failed to fetch gas readings');
-  return res.json();
-}
-
-export async function getGasReading(id: number): Promise<GasReading> {
-  const res = await fetch(`${API_BASE}/readings/gas/${id}`);
-  if (!res.ok) throw new Error('Failed to fetch gas reading');
   return res.json();
 }
 

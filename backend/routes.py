@@ -9,7 +9,6 @@ from models import (
     ElectricityReading,
     WaterReading,
     GasReading,
-    MonthlyReadings,
     MeterResetsInput,
     ResetResult
 )
@@ -36,7 +35,6 @@ from db import (
     delete_electricity_reading,
     delete_water_reading,
     delete_gas_reading,
-    get_monthly_readings,
     get_calculation_details_by_type,
     save_meter_resets,
     get_readings_by_date,
@@ -62,19 +60,6 @@ def init_config(config: AppConfig):
 def reset_app():
     backup_and_reset_db()
     return {"status": "success", "message": "Database reset and backed up"}
-
-# Monthly Readings Endpoint
-@router.get("/readings/monthly/{period}", response_model=MonthlyReadings)
-def get_monthly(period: str):
-    """Get all readings for a specific month across all utility types."""
-    readings = get_monthly_readings(period)
-    
-    return MonthlyReadings(
-        period=period,
-        electricity=[ElectricityReading(**r) for r in readings['electricity']],
-        water=[WaterReading(**r) for r in readings['water']],
-        gas=[GasReading(**r) for r in readings['gas']]
-    )
 
 # Electricity Endpoints
 @router.get("/readings/electricity", response_model=List[ElectricityReading])

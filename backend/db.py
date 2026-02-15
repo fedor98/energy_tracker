@@ -1067,16 +1067,6 @@ def delete_gas_reading(id: int) -> bool:
 
     return deleted
 
-# Combined queries
-def get_monthly_readings(period: str) -> Dict[str, List[Dict[str, Any]]]:
-    """Get all readings for a specific month across all utility types."""
-    return {
-        'electricity': get_electricity_readings(start_period=period, end_period=period),
-        'water': get_water_readings(start_period=period, end_period=period),
-        'gas': get_gas_readings(start_period=period, end_period=period)
-    }
-
-
 def get_calculation_details_by_type(
     entity_type: str,
     start_period: Optional[str] = None,
