@@ -238,11 +238,28 @@ def _calculate_electricity_consumption(conn, meter_name: str, date: str):
     ''', (meter_name, f"{period}-32"))  # Day 32 ensures we're in next month
     next_period_reading = c.fetchone()
     
+    # Check if next reading is in the immediate next month
+    # Only use it if it's the directly following calendar month
+    from datetime import datetime
+    period_date = datetime.strptime(period, '%Y-%m')
+    # Calculate expected next month (standard library only)
+    year = period_date.year
+    month = period_date.month
+    if month == 12:
+        year += 1
+        month = 1
+    else:
+        month += 1
+    expected_next_period = f"{year:04d}-{month:02d}"
+    
     # Combine readings: period readings + next period's first reading
     # Convert sqlite3.Row objects to dicts for easier handling
     all_readings = [dict(row) for row in period_readings]
     if next_period_reading:
-        all_readings.append(dict(next_period_reading))
+        next_reading_period = next_period_reading['date'][:7]
+        # Only add next reading if it's in the immediate next month
+        if next_reading_period == expected_next_period:
+            all_readings.append(dict(next_period_reading))
     
     # Calculate consumption
     consumption, calc_details, readings_count, segment_count = _calculate_consumption_from_readings(all_readings)
@@ -311,16 +328,33 @@ def _calculate_water_consumption(conn, room: str, date: str, is_warm_water = Non
         ''', (room, is_warm, f"{period}-32"))
         next_period_reading = c.fetchone()
         
+        # Check if next reading is in the immediate next month
+        # Only use it if it's the directly following calendar month
+        from datetime import datetime
+        period_date = datetime.strptime(period, '%Y-%m')
+        # Calculate expected next month (standard library only)
+        year = period_date.year
+        month = period_date.month
+        if month == 12:
+            year += 1
+            month = 1
+        else:
+            month += 1
+        expected_next_period = f"{year:04d}-{month:02d}"
+        
         # Build readings list
         # Convert sqlite3.Row objects to dicts for easier handling
         all_readings = [dict(row) for row in period_readings]
         if next_period_reading:
-            all_readings.append({
-                'date': next_period_reading['date'],
-                'value': next_period_reading['value'],
-                'comment': next_period_reading['comment'] or '',
-                'is_reset': next_period_reading['is_reset']
-            })
+            next_reading_period = next_period_reading['date'][:7]
+            # Only add next reading if it's in the immediate next month
+            if next_reading_period == expected_next_period:
+                all_readings.append({
+                    'date': next_period_reading['date'],
+                    'value': next_period_reading['value'],
+                    'comment': next_period_reading['comment'] or '',
+                    'is_reset': next_period_reading['is_reset']
+                })
         
         # Calculate consumption
         consumption, calc_details, readings_count, segment_count = _calculate_consumption_from_readings(all_readings)
@@ -378,11 +412,28 @@ def _calculate_gas_consumption(conn, room: str, date: str):
     ''', (room, f"{period}-32"))
     next_period_reading = c.fetchone()
     
+    # Check if next reading is in the immediate next month
+    # Only use it if it's the directly following calendar month
+    from datetime import datetime
+    period_date = datetime.strptime(period, '%Y-%m')
+    # Calculate expected next month (standard library only)
+    year = period_date.year
+    month = period_date.month
+    if month == 12:
+        year += 1
+        month = 1
+    else:
+        month += 1
+    expected_next_period = f"{year:04d}-{month:02d}"
+    
     # Combine readings
     # Convert sqlite3.Row objects to dicts for easier handling
     all_readings = [dict(row) for row in period_readings]
     if next_period_reading:
-        all_readings.append(dict(next_period_reading))
+        next_reading_period = next_period_reading['date'][:7]
+        # Only add next reading if it's in the immediate next month
+        if next_reading_period == expected_next_period:
+            all_readings.append(dict(next_period_reading))
     
     # Calculate consumption
     consumption, calc_details, readings_count, segment_count = _calculate_consumption_from_readings(all_readings)
