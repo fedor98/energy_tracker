@@ -15,13 +15,14 @@
 
 import { useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
-import type { CalculationData } from '../lib/api';
+import type { CalculationData, DashboardTransform } from '../lib/api';
 
 interface ConsumptionChartProps {
   electricityData: CalculationData;
   waterData: CalculationData;
   gasData: CalculationData;
   cumulatedWater: boolean;
+  transform: DashboardTransform;
 }
 
 /**
@@ -38,6 +39,7 @@ export function ConsumptionChart({
   waterData,
   gasData,
   cumulatedWater,
+  transform,
 }: ConsumptionChartProps) {
   const chartRef = useRef<HTMLCanvasElement>(null);
   const chartInstance = useRef<Chart | null>(null);
@@ -52,32 +54,39 @@ export function ConsumptionChart({
     }
 
     // Process electricity data from CalculationData
-    // Only include periods with valid consumption (not null)
+    // Store both scaled (for line display) and raw (for tooltip) values
     const elecByPeriod: Record<string, number> = {};
+    const elecRawByPeriod: Record<string, number> = {};
     electricityData.periods.forEach((period) => {
       const hasValidConsumption = period.meters.some(m => m.consumption !== null);
       if (hasValidConsumption) {
         const total = period.meters.reduce((sum, m) => sum + (m.consumption || 0), 0);
-        elecByPeriod[period.period] = total;
+        elecRawByPeriod[period.period] = total;
+        elecByPeriod[period.period] = total * transform.electricity_scale + transform.electricity_offset;
       }
     });
 
     // Process gas data from CalculationData
-    // Only include periods with valid consumption (not null)
+    // Store both scaled (for line display) and raw (for tooltip) values
     const gasByPeriod: Record<string, number> = {};
+    const gasRawByPeriod: Record<string, number> = {};
     gasData.periods.forEach((period) => {
       const hasValidConsumption = period.meters.some(m => m.consumption !== null);
       if (hasValidConsumption) {
         const total = period.meters.reduce((sum, m) => sum + (m.consumption || 0), 0);
-        gasByPeriod[period.period] = total;
+        gasRawByPeriod[period.period] = total;
+        gasByPeriod[period.period] = total * transform.gas_scale + transform.gas_offset;
       }
     });
 
     // Process water data from CalculationData
-    // Only include periods with valid consumption (not null)
+    // Store both scaled (for line display) and raw (for tooltip) values
     const waterTotalByPeriod: Record<string, number> = {};
     const waterWarmByPeriod: Record<string, number> = {};
     const waterColdByPeriod: Record<string, number> = {};
+    const waterTotalRawByPeriod: Record<string, number> = {};
+    const waterWarmRawByPeriod: Record<string, number> = {};
+    const waterColdRawByPeriod: Record<string, number> = {};
 
     waterData.periods.forEach((period) => {
       const hasValidConsumption = period.meters.some(m => m.consumption !== null);
@@ -98,9 +107,12 @@ export function ConsumptionChart({
           }
         });
 
-        waterTotalByPeriod[period.period] = periodTotal;
-        waterWarmByPeriod[period.period] = periodWarm;
-        waterColdByPeriod[period.period] = periodCold;
+        waterTotalRawByPeriod[period.period] = periodTotal;
+        waterWarmRawByPeriod[period.period] = periodWarm;
+        waterColdRawByPeriod[period.period] = periodCold;
+        waterTotalByPeriod[period.period] = periodTotal * transform.water_scale + transform.water_offset;
+        waterWarmByPeriod[period.period] = periodWarm * transform.water_scale + transform.water_offset;
+        waterColdByPeriod[period.period] = periodCold * transform.water_scale + transform.water_offset;
       }
     });
 
@@ -195,6 +207,12 @@ export function ConsumptionChart({
       });
     }
 
+    // Check if any scale is not 1.0 or any offset is not 0 (to hide Y-axis)
+    const hasTransform = 
+      transform.electricity_scale !== 1.0 || transform.electricity_offset !== 0 ||
+      transform.gas_scale !== 1.0 || transform.gas_offset !== 0 ||
+      transform.water_scale !== 1.0 || transform.water_offset !== 0;
+
     // Create new chart instance
     const ctx = chartRef.current.getContext('2d');
     if (ctx) {
@@ -210,6 +228,7 @@ export function ConsumptionChart({
           scales: {
             y: {
               beginAtZero: true,
+               display: !hasTransform, // Hide Y-axis when transform is active
               grid: {
                 color: 'rgba(0, 0, 0, 0.05)',
               },
@@ -238,6 +257,31 @@ export function ConsumptionChart({
               borderWidth: 1,
               padding: 12,
               cornerRadius: 8,
+              callbacks: {
+                label: function(context: any) {
+                  const datasetLabel = context.dataset.label || '';
+                  const period = context.label;
+                  let value: number | null = null;
+
+                  // Get the raw (unscaled) value based on the dataset label
+                  if (datasetLabel.includes('Electricity')) {
+                    value = elecRawByPeriod[period] ?? null;
+                  } else if (datasetLabel.includes('Gas')) {
+                    value = gasRawByPeriod[period] ?? null;
+                  } else if (datasetLabel.includes('Warm Water')) {
+                    value = waterWarmRawByPeriod[period] ?? null;
+                  } else if (datasetLabel.includes('Cold Water')) {
+                    value = waterColdRawByPeriod[period] ?? null;
+                  } else if (datasetLabel.includes('Water')) {
+                    value = waterTotalRawByPeriod[period] ?? null;
+                  }
+
+                  if (value !== null) {
+                    return `${datasetLabel}: ${value.toFixed(1)}`;
+                  }
+                  return datasetLabel;
+                },
+              },
             },
           },
           interaction: {
@@ -257,7 +301,7 @@ export function ConsumptionChart({
         chartInstance.current = null;
       }
     };
-  }, [electricityData, waterData, gasData, cumulatedWater]);
+  }, [electricityData, waterData, gasData, cumulatedWater, transform]);
 
   // Show empty state if no data
   const hasData = 

@@ -33,17 +33,21 @@ import {
   getGasCalculations,
   getConfig,
   deleteReadingsByDate,
+  getDashboardTransform,
+  saveDashboardTransform,
 } from '../lib/api';
 import type {
   ElectricityReading,
   WaterReading,
   GasReading,
   CalculationData,
+  DashboardTransform,
 } from '../lib/api';
 import { ConsumptionChart } from '../components/ConsumptionChart';
 import { CalculationTables } from '../components/CalculationTables';
 import { MeterDataTable } from '../components/MeterDataTable';
 import { DeleteConfirmationDialog } from '../components/DeleteConfirmationDialog';
+import { DashboardTransformControls } from '../components/DashboardTransformControls';
 
 // Tab configuration for the dashboard - matches original layout
 interface DashboardTab {
@@ -187,6 +191,16 @@ export default function Dashboard() {
   // Cumulated water toggle - only affects consumption chart
   const [cumulatedWater, setCumulatedWater] = useState<boolean>(true);
 
+  // Dashboard transform settings for better visualization
+  const [transform, setTransform] = useState<DashboardTransform>({
+    electricity_scale: 1.0,
+    electricity_offset: 0.0,
+    gas_scale: 1.0,
+    gas_offset: 0.0,
+    water_scale: 1.0,
+    water_offset: 0.0,
+  });
+
   // Data states for meter readings
   const [electricityData, setElectricityData] = useState<ElectricityReading[]>([]);
   const [waterData, setWaterData] = useState<WaterReading[]>([]);
@@ -230,6 +244,23 @@ export default function Dashboard() {
 
     checkConfig();
   }, [navigate]);
+
+  /**
+   * Load dashboard transform settings on mount
+   */
+  useEffect(() => {
+    async function loadTransform() {
+      try {
+        const savedTransform = await getDashboardTransform();
+        setTransform(savedTransform);
+      } catch (err) {
+        console.error('Failed to load dashboard transform:', err);
+        // Keep default values on error
+      }
+    }
+
+    loadTransform();
+  }, []);
 
   /**
    * Initialize default date range on mount (last 12 months)
@@ -393,6 +424,40 @@ export default function Dashboard() {
   };
 
   /**
+   * Handle scale factor changes
+   */
+  const handleTransformChange = async (type: 'electricity_scale' | 'gas_scale' | 'water_scale', value: string) => {
+    const numValue = parseFloat(value);
+    if (isNaN(numValue) || numValue < 0) return;
+
+    const newTransform = { ...transform, [type]: numValue };
+    setTransform(newTransform);
+
+    try {
+      await saveDashboardTransform(newTransform);
+    } catch (err) {
+      console.error('Failed to save transform:', err);
+    }
+  };
+
+  /**
+   * Handle offset changes
+   */
+  const handleOffsetChange = async (type: 'electricity_offset' | 'gas_offset' | 'water_offset', value: string) => {
+    const numValue = parseFloat(value);
+    if (isNaN(numValue)) return;
+
+    const newTransform = { ...transform, [type]: numValue };
+    setTransform(newTransform);
+
+    try {
+      await saveDashboardTransform(newTransform);
+    } catch (err) {
+      console.error('Failed to save offset:', err);
+    }
+  };
+
+  /**
    * Render the appropriate content based on active tab
    */
   const renderTabContent = () => {
@@ -414,6 +479,7 @@ export default function Dashboard() {
             waterData={waterCalcData}
             gasData={gasCalcData}
             cumulatedWater={cumulatedWater}
+            transform={transform}
           />
         );
 
@@ -654,6 +720,15 @@ export default function Dashboard() {
         <Card>
           {/* Tab Navigation */}
           <DashboardTabs activeTab={activeTab} onChange={setActiveTab} />
+
+          {/* Transform Controls - Only in Consumption tab */}
+          {activeTab === 'consumption' && (
+            <DashboardTransformControls
+              transform={transform}
+              onTransformChange={handleTransformChange}
+              onOffsetChange={handleOffsetChange}
+            />
+          )}
 
           {/* Cumulated Water Checkbox - Only in Consumption tab */}
           {activeTab === 'consumption' && (

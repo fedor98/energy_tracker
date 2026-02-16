@@ -41,6 +41,14 @@ class AppConfig(BaseModel):
             electricity=ElectricityConfig(meters=[])
         )
 
+class DashboardTransform(BaseModel):
+    electricity_scale: float = 1.0
+    electricity_offset: float = 0.0
+    gas_scale: float = 1.0
+    gas_offset: float = 0.0
+    water_scale: float = 1.0
+    water_offset: float = 0.0
+
 # Reading Models
 class ElectricityReadingInput(BaseModel):
     date: str  # YYYY-MM-DD

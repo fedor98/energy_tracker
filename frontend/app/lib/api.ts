@@ -216,6 +216,16 @@ export interface RecalculateResponse {
   stats: RecalculateStats;
 }
 
+// Dashboard Transform Types
+export interface DashboardTransform {
+  electricity_scale: number;
+  electricity_offset: number;
+  gas_scale: number;
+  gas_offset: number;
+  water_scale: number;
+  water_offset: number;
+}
+
 // Configuration API
 export async function getConfig(): Promise<AppConfig | null> {
   const res = await fetch(`${API_BASE}/config`);
@@ -533,5 +543,22 @@ export async function recalculateAllConsumption(): Promise<RecalculateResponse> 
     const error = await res.json();
     throw new Error(error.detail || 'Failed to recalculate consumption');
   }
+  return res.json();
+}
+
+// Dashboard Transform API
+export async function getDashboardTransform(): Promise<DashboardTransform> {
+  const res = await fetch(`${API_BASE}/dashboard/transform`);
+  if (!res.ok) throw new Error('Failed to fetch dashboard transform');
+  return res.json();
+}
+
+export async function saveDashboardTransform(transform: DashboardTransform): Promise<ApiResponse> {
+  const res = await fetch(`${API_BASE}/dashboard/transform`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(transform)
+  });
+  if (!res.ok) throw new Error('Failed to save dashboard transform');
   return res.json();
 }

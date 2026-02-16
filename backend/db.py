@@ -554,6 +554,33 @@ def get_config() -> Optional[AppConfig]:
         return AppConfig.model_validate_json(row['value'])
     return None
 
+def get_dashboard_transform() -> dict:
+    """Get dashboard transform settings from config table. Returns default values if not set."""
+    import json
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute('SELECT value FROM config WHERE key = ?', ('dashboard_transform',))
+    row = c.fetchone()
+    conn.close()
+    
+    if row:
+        return json.loads(row['value'])
+    return {
+        'electricity_scale': 1.0, 'electricity_offset': 0.0,
+        'gas_scale': 1.0, 'gas_offset': 0.0,
+        'water_scale': 1.0, 'water_offset': 0.0
+    }
+
+def save_dashboard_transform(transform: dict):
+    """Save dashboard transform settings to config table."""
+    import json
+    conn = get_db_connection()
+    c = conn.cursor()
+    c.execute('INSERT OR REPLACE INTO config (key, value) VALUES (?, ?)',
+              ('dashboard_transform', json.dumps(transform)))
+    conn.commit()
+    conn.close()
+
 # Electricity CRUD Operations
 def save_electricity_reading(reading: ElectricityReadingInput) -> int:
     """Save or update an electricity reading. Returns the reading ID."""

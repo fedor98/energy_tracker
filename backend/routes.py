@@ -10,7 +10,8 @@ from models import (
     WaterReading,
     GasReading,
     MeterResetsInput,
-    ResetResult
+    ResetResult,
+    DashboardTransform
 )
 from db import (
     get_config,
@@ -41,7 +42,9 @@ from db import (
     count_readings_by_date,
     get_meters_for_date,
     update_readings_by_date,
-    delete_readings_by_date
+    delete_readings_by_date,
+    get_dashboard_transform,
+    save_dashboard_transform
 )
 
 router = APIRouter()
@@ -455,11 +458,11 @@ def update_readings_for_date(date: str, request: UpdateReadingsByDateRequest):
 def delete_readings_for_date(date: str, is_reset: Optional[bool] = Query(None)):
     """
     Delete all readings for a specific date.
-    
+
     Args:
         date: Date in YYYY-MM-DD format
         is_reset: If True, only delete reset readings. If False, exclude reset readings.
-    
+
     Returns counts of deleted readings by type.
     """
     try:
@@ -467,3 +470,22 @@ def delete_readings_for_date(date: str, is_reset: Optional[bool] = Query(None)):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete readings: {str(e)}")
+
+# Dashboard Transform Endpoints
+@router.get("/dashboard/transform", response_model=DashboardTransform)
+def get_dashboard_transform_endpoint():
+    """Get dashboard transform settings for electricity, gas, and water."""
+    try:
+        transform = get_dashboard_transform()
+        return DashboardTransform(**transform)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get transform settings: {str(e)}")
+
+@router.post("/dashboard/transform")
+def save_dashboard_transform_endpoint(transform: DashboardTransform):
+    """Save dashboard transform settings for electricity, gas, and water."""
+    try:
+        save_dashboard_transform(transform.model_dump())
+        return {"status": "success", "message": "Transform settings saved"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save transform settings: {str(e)}")
