@@ -26,6 +26,7 @@ import { GasMeterForm } from '../components/GasMeterForm';
 import { PageLayout, DateSection, FormFooter } from '../components/accordion-page-layout';
 import { getConfig, saveResets, type AppConfig, type MeterResetsInput } from '../lib/api';
 import { ElectricityIcon, WaterIcon, GasIcon } from '../components/icons/MeterIcons';
+import { useToast } from '../hooks/useToast';
 
 type OpenSection = 'electricity' | 'water' | 'gas' | null;
 
@@ -37,13 +38,13 @@ type ResetData = {
 
 export default function ResetMeter() {
   const navigate = useNavigate();
+  const toast = useToast();
   
   // Config loaded from backend
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   
   // Accordion state - only one section open at a time
   const [openSection, setOpenSection] = useState<OpenSection>(null);
@@ -119,7 +120,6 @@ export default function ResetMeter() {
 
     setSaving(true);
     setError(null);
-    setSuccessMessage(null);
 
     try {
       const resetInput: MeterResetsInput = {
@@ -176,14 +176,12 @@ export default function ResetMeter() {
       });
 
       await saveResets(resetInput);
-      setSuccessMessage('Resets saved successfully');
       
-      // Navigate back to dashboard after a short delay
-      setTimeout(() => {
-        navigate('/');
-      }, 1500);
+      // Show success toast and navigate to dashboard
+      toast.success('Resets saved successfully');
+      navigate('/');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save resets');
+      toast.error(err instanceof Error ? err.message : 'Failed to save resets');
       setSaving(false);
     }
   }
@@ -195,7 +193,6 @@ export default function ResetMeter() {
       loading={loading}
       loadingText="Loading..."
       error={error}
-      success={successMessage}
     >
       <DateSection
         label="Replacement Date"

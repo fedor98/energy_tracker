@@ -43,7 +43,6 @@ export default function Dashboard() {
     loadingCalculations,
     checkingConfig,
     error,
-    successMessage,
     deleteDialogOpen,
     dateToDelete,
     transform,
@@ -176,13 +175,6 @@ export default function Dashboard() {
         {error && (
           <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
             <p className="text-red-700">Error loading data: {error}</p>
-          </div>
-        )}
-
-        {/* Success Message Display */}
-        {successMessage && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-md animate-in fade-in slide-in-from-top-2 duration-300">
-            <p className="text-green-700">{successMessage}</p>
           </div>
         )}
 

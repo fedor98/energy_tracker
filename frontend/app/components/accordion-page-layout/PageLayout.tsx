@@ -3,13 +3,13 @@
  *
  * A reusable layout wrapper for page routes (Add, Reset, Edit).
  * Provides consistent styling including the outer container, white card,
- * header section, and message banners.
+ * header section, and error message banners.
  *
  * Features:
  * - Consistent max-width and padding
  * - White card with shadow
  * - Optional loading state with spinner
- * - Error and success message banners
+ * - Error message banner (success now uses toast notifications)
  * - Responsive design
  */
 
@@ -28,8 +28,6 @@ export interface PageLayoutProps {
   loadingText?: string;
   /** Error message to display */
   error?: string | null;
-  /** Success message to display */
-  success?: string | null;
   /** Maximum width of the content area */
   maxWidth?: 'sm' | 'md' | 'lg';
 }
@@ -47,7 +45,6 @@ export function PageLayout({
   loading = false,
   loadingText = 'Loading...',
   error = null,
-  success = null,
   maxWidth = 'md',
 }: PageLayoutProps) {
   // Loading state
@@ -82,13 +79,6 @@ export function PageLayout({
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
               {error}
-            </div>
-          )}
-
-          {/* Success Message */}
-          {success && (
-            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
-              {success}
             </div>
           )}
 

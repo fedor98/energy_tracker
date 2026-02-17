@@ -25,18 +25,19 @@ import { GasMeterForm } from '../components/GasMeterForm';
 import { PageLayout, DateSection, FormFooter } from '../components/accordion-page-layout';
 import { getConfig, createElectricityReading, createWaterReading, createGasReading, type AppConfig, type ElectricityReadingInput, type WaterReadingInput, type GasReadingInput } from '../lib/api';
 import { ElectricityIcon, WaterIcon, GasIcon } from '../components/icons/MeterIcons';
+import { useToast } from '../hooks/useToast';
 
 type OpenSection = 'electricity' | 'water' | 'gas' | null;
 
 export default function AddReading() {
   const navigate = useNavigate();
+  const toast = useToast();
   
   // Config loaded from backend
   const [config, setConfig] = useState<AppConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   
   // Accordion state - only one section open at a time
   const [openSection, setOpenSection] = useState<OpenSection>(null);
@@ -104,7 +105,6 @@ export default function AddReading() {
 
     setSaving(true);
     setError(null);
-    setSuccessMessage(null);
 
     try {
       // Save electricity readings
@@ -162,14 +162,11 @@ export default function AddReading() {
       // Execute all saves in parallel
       await Promise.all([...electricityPromises, ...waterPromises, ...gasPromises]);
       
-      setSuccessMessage('Readings saved successfully');
-      
-      // Navigate back to dashboard after a short delay
-      setTimeout(() => {
-        navigate('/');
-      }, 1500);
+      // Show success toast and navigate to dashboard
+      toast.success('Readings saved successfully');
+      navigate('/');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save readings');
+      toast.error(err instanceof Error ? err.message : 'Failed to save readings');
       setSaving(false);
     }
   }
@@ -181,7 +178,6 @@ export default function AddReading() {
       loading={loading}
       loadingText="Loading..."
       error={error}
-      success={successMessage}
     >
       <DateSection
         label="Measurement Date"

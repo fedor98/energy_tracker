@@ -33,6 +33,7 @@ import type {
 } from '../lib/api';
 import { getReadingsByDate, updateReadingsByDate } from '../lib/api';
 import { ElectricityIcon, WaterIcon, GasIcon } from '../components/icons/MeterIcons';
+import { useToast } from '../hooks/useToast';
 
 type OpenSection = 'electricity' | 'water' | 'gas' | null;
 
@@ -40,6 +41,7 @@ export default function EditRoute() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const toast = useToast();
 
   const date = searchParams.get('date') || '';
   const returnPeriod = location.state?.returnPeriod;
@@ -50,7 +52,6 @@ export default function EditRoute() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   
   // Accordion state - only one section open at a time
   const [openSection, setOpenSection] = useState<OpenSection>(null);
@@ -203,7 +204,6 @@ export default function EditRoute() {
   const handleSave = async () => {
     setSaving(true);
     setError(null);
-    setSuccessMessage(null);
 
     try {
       const electricityUpdates: ReadingUpdateItem[] = [];
@@ -256,14 +256,11 @@ export default function EditRoute() {
         gas: gasUpdates
       });
 
-      setSuccessMessage('Readings updated successfully');
-
-      // Navigate back to dashboard after a short delay
-      setTimeout(() => {
-        navigate('/', { state: { preselectedPeriod: returnPeriod } });
-      }, 1500);
+      // Show success toast and navigate to dashboard
+      toast.success('Readings updated successfully');
+      navigate('/', { state: { preselectedPeriod: returnPeriod } });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save readings');
+      toast.error(err instanceof Error ? err.message : 'Failed to save readings');
       setSaving(false);
     }
   };
@@ -285,7 +282,6 @@ export default function EditRoute() {
       loading={loading}
       loadingText="Loading readings..."
       error={error}
-      success={successMessage}
     >
       {!hasAnyReadings() ? (
         <div className="text-center py-8">

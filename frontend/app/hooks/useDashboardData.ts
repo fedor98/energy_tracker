@@ -32,6 +32,7 @@ import type {
   CalculationData,
   DashboardTransform,
 } from '../lib/api';
+import { useToast } from './useToast';
 
 /**
  * State interface for dashboard data management
@@ -57,7 +58,6 @@ interface DashboardState {
   
   // Error state
   error: string | null;
-  successMessage: string | null;
   
   // UI state
   deleteDialogOpen: boolean;
@@ -79,6 +79,8 @@ const defaultTransform: DashboardTransform = {
 };
 
 export function useDashboardData(navigate: (path: string, options?: { replace?: boolean; state?: Record<string, unknown> }) => void) {
+  const toast = useToast();
+
   // Filter state
   const [startMonth, setStartMonth] = useState<string>('');
   const [endMonth, setEndMonth] = useState<string>('');
@@ -97,9 +99,8 @@ export function useDashboardData(navigate: (path: string, options?: { replace?: 
   const [loadingCalculations, setLoadingCalculations] = useState<boolean>(false);
   const [checkingConfig, setCheckingConfig] = useState<boolean>(true);
 
-  // Error and success states
+  // Error state
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -222,14 +223,14 @@ export function useDashboardData(navigate: (path: string, options?: { replace?: 
   /**
    * Handle confirmed delete action
    * Deletes readings for the selected date and refreshes the data
-   * Shows success message and auto-hides it after 3 seconds
+   * Shows success toast notification
    */
   const handleDeleteConfirm = useCallback(async () => {
     if (!dateToDelete) return;
 
     try {
       await deleteReadingsByDate(dateToDelete);
-      setSuccessMessage('Readings deleted successfully');
+      toast.success('Readings deleted successfully');
       setDeleteDialogOpen(false);
       setDateToDelete(null);
 
@@ -243,16 +244,11 @@ export function useDashboardData(navigate: (path: string, options?: { replace?: 
       setElectricityData(elecData);
       setWaterData(waterDataResult);
       setGasData(gasDataResult);
-
-      // Auto-clear success message after 3 seconds
-      setTimeout(() => {
-        setSuccessMessage(null);
-      }, 3000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete readings');
+      toast.error(err instanceof Error ? err.message : 'Failed to delete readings');
       setDeleteDialogOpen(false);
     }
-  }, [dateToDelete, startMonth, endMonth]);
+  }, [dateToDelete, startMonth, endMonth, toast]);
 
   /**
    * Handle cancel delete action
@@ -321,7 +317,6 @@ export function useDashboardData(navigate: (path: string, options?: { replace?: 
     loadingCalculations,
     checkingConfig,
     error,
-    successMessage,
     deleteDialogOpen,
     dateToDelete,
     transform,
