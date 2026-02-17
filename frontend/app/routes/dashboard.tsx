@@ -12,162 +12,56 @@
  * for calculation details.
  */
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router';
 import { Plus, RotateCcw, Settings } from 'lucide-react';
-import {
-  ConsumptionIcon,
-  CalcIcon,
-  ElectricityIcon,
-  WaterIcon,
-  GasIcon,
-} from '../components/icons/MeterIcons';
 import { Card } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import {
-  getElectricityReadings,
-  getWaterReadings,
-  getGasReadings,
-  getElectricityCalculations,
-  getWaterCalculations,
-  getGasCalculations,
-  getConfig,
-  deleteReadingsByDate,
-  getDashboardTransform,
-  saveDashboardTransform,
-} from '../lib/api';
-import type {
-  ElectricityReading,
-  WaterReading,
-  GasReading,
-  CalculationData,
-  DashboardTransform,
-} from '../lib/api';
-import { ConsumptionChart } from '../components/ConsumptionChart';
-import { CalculationTables } from '../components/CalculationTables';
-import { MeterDataTable } from '../components/MeterDataTable';
+import { useDashboardData } from '../hooks/useDashboardData';
+import { MonthFilterInput } from '../components/MonthFilterInput';
+import { DashboardTabs } from '../components/DashboardTabs';
+import { TabContent } from '../components/TabContent';
 import { DeleteConfirmationDialog } from '../components/DeleteConfirmationDialog';
 import { DashboardTransformControls } from '../components/DashboardTransformControls';
-
-// Tab configuration for the dashboard - matches original layout
-interface DashboardTab {
-  id: string;
-  label: string;
-  position: 'left' | 'right';
-  icon: (isActive: boolean) => React.ReactNode;
-}
-
-const DASHBOARD_TABS: DashboardTab[] = [
-  { id: 'consumption', label: 'Consumption', position: 'left', icon: (isActive) => <ConsumptionIcon size={16} className={isActive ? '!text-white' : ''} /> },
-  { id: 'calc', label: 'Calc', position: 'left', icon: (isActive) => <CalcIcon size={16} className={isActive ? '!text-white' : ''} /> },
-  { id: 'electricity', label: 'Electricity', position: 'right', icon: (isActive) => <ElectricityIcon size={16} className={isActive ? '!text-white' : ''} /> },
-  { id: 'water', label: 'Water', position: 'right', icon: (isActive) => <WaterIcon size={16} className={isActive ? '!text-white' : ''} /> },
-  { id: 'gas', label: 'Gas', position: 'right', icon: (isActive) => <GasIcon size={16} className={isActive ? '!text-white' : ''} /> },
-];
-
-// Skeleton component for loading states
-function FilterSkeleton() {
-  return (
-    <div className="animate-pulse space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="h-10 bg-gray-200 rounded"></div>
-        <div className="h-10 bg-gray-200 rounded"></div>
-        <div className="h-10 bg-gray-200 rounded"></div>
-        <div className="h-10 bg-gray-200 rounded"></div>
-      </div>
-    </div>
-  );
-}
-
-function ContentSkeleton() {
-  return (
-    <div className="animate-pulse space-y-4">
-      <div className="h-8 bg-gray-200 rounded w-1/4"></div>
-      <div className="h-64 bg-gray-200 rounded"></div>
-      <div className="space-y-2">
-        <div className="h-4 bg-gray-200 rounded"></div>
-        <div className="h-4 bg-gray-200 rounded"></div>
-        <div className="h-4 bg-gray-200 rounded w-5/6"></div>
-      </div>
-    </div>
-  );
-}
-
-/**
- * DashboardTabs Component
- * Custom tabs implementation with specific layout requirements:
- * - Desktop: Consumption + Calc on left, others pushed to right
- * - Mobile: Two rows (Consumption/Calc | Electricity/Water/Gas)
- */
-interface DashboardTabsProps {
-  activeTab: string;
-  onChange: (tabId: string) => void;
-}
-
-function DashboardTabs({ activeTab, onChange }: DashboardTabsProps) {
-  const leftTabs = DASHBOARD_TABS.filter((t) => t.position === 'left');
-  const rightTabs = DASHBOARD_TABS.filter((t) => t.position === 'right');
-
-  const TabButton = ({ tab, showLabel = true, flex = false }: { tab: DashboardTab; showLabel?: boolean; flex?: boolean }) => (
-    <button
-      key={tab.id}
-      onClick={() => onChange(tab.id)}
-      className={`px-4 py-2 rounded-lg font-medium text-sm sm:text-base border transition-colors ${
-        activeTab === tab.id
-          ? 'bg-indigo-600 text-white border-indigo-600'
-          : 'bg-gray-50 text-gray-700 border-gray-300 hover:bg-gray-100'
-      } ${flex ? 'flex-1' : ''} ${!showLabel ? 'flex items-center justify-center' : ''}`}
-    >
-      <span className={`flex items-center justify-center w-full ${showLabel ? 'gap-2' : ''}`}>
-        {tab.icon(activeTab === tab.id)}
-        {showLabel && tab.label}
-      </span>
-    </button>
-  );
-
-  return (
-    <div className="flex flex-col gap-2 pb-4">
-      {/* Mobile */}
-      <div className="flex sm:hidden flex-col gap-2">
-        <div className="flex gap-2">
-          {leftTabs.map((tab) => (
-            <TabButton key={tab.id} tab={tab} showLabel flex />
-          ))}
-        </div>
-        <div className="flex gap-2">
-          {rightTabs.map((tab) => (
-            <TabButton key={tab.id} tab={tab} showLabel={false} flex />
-          ))}
-        </div>
-      </div>
-
-      {/* Desktop */}
-      <div className="hidden sm:flex flex-row gap-2">
-        <div className="flex gap-2">
-          {leftTabs.map((tab) => (
-            <TabButton key={tab.id} tab={tab} />
-          ))}
-        </div>
-        <div className="flex-1"></div>
-        <div className="flex gap-2">
-          {rightTabs.map((tab) => (
-            <TabButton key={tab.id} tab={tab} />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [activeTab, setActiveTab] = useState<string>('consumption');
+  const [cumulatedWater, setCumulatedWater] = useState<boolean>(true);
   
-  // Filter state for date range selection
-  const [startMonth, setStartMonth] = useState<string>('');
-  const [endMonth, setEndMonth] = useState<string>('');
+  const {
+    startMonth,
+    endMonth,
+    electricityData,
+    waterData,
+    gasData,
+    elecCalcData,
+    waterCalcData,
+    gasCalcData,
+    loadingReadings,
+    loadingCalculations,
+    checkingConfig,
+    error,
+    successMessage,
+    deleteDialogOpen,
+    dateToDelete,
+    transform,
+    setStartMonth,
+    setEndMonth,
+    setDeleteDialogOpen,
+    setDateToDelete,
+    handleResetFilters,
+    handleDeleteConfirm,
+    handleDeleteCancel,
+    handleTransformChange,
+    handleOffsetChange,
+  } = useDashboardData(navigate);
 
-  // Read preselected period from navigation state (when returning from edit)
+  /**
+   * Handle preselected period from navigation state
+   * When returning from edit page, restore the selected period
+   */
   useEffect(() => {
     const preselectedPeriod = location.state?.preselectedPeriod;
     if (preselectedPeriod) {
@@ -176,361 +70,25 @@ export default function Dashboard() {
       // Clear the state so it doesn't persist on subsequent renders
       navigate(location.pathname, { replace: true, state: {} });
     }
-  }, [location.state, location.pathname, navigate]);
-
-  // Refs for date picker interactions
-  const startMonthRef = useRef<HTMLInputElement>(null);
-  const endMonthRef = useRef<HTMLInputElement>(null);
-  
-  // Firefox detection for date input compatibility
-  const isFirefox = typeof navigator !== 'undefined' && navigator.userAgent.toLowerCase().includes('firefox');
-
-  // Navigation state for active tab
-  const [activeTab, setActiveTab] = useState<string>('consumption');
-
-  // Cumulated water toggle - only affects consumption chart
-  const [cumulatedWater, setCumulatedWater] = useState<boolean>(true);
-
-  // Dashboard transform settings for better visualization
-  const [transform, setTransform] = useState<DashboardTransform>({
-    electricity_scale: 1.0,
-    electricity_offset: 0.0,
-    gas_scale: 1.0,
-    gas_offset: 0.0,
-    water_scale: 1.0,
-    water_offset: 0.0,
-  });
-
-  // Data states for meter readings
-  const [electricityData, setElectricityData] = useState<ElectricityReading[]>([]);
-  const [waterData, setWaterData] = useState<WaterReading[]>([]);
-  const [gasData, setGasData] = useState<GasReading[]>([]);
-
-  // Data states for calculations (loaded separately for Calc tab)
-  const [elecCalcData, setElecCalcData] = useState<CalculationData>({ periods: [] });
-  const [waterCalcData, setWaterCalcData] = useState<CalculationData>({ periods: [] });
-  const [gasCalcData, setGasCalcData] = useState<CalculationData>({ periods: [] });
-
-  // Loading and error states
-  const [loadingReadings, setLoadingReadings] = useState<boolean>(false);
-  const [loadingCalculations, setLoadingCalculations] = useState<boolean>(false);
-  const [checkingConfig, setCheckingConfig] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  // Delete dialog state
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [dateToDelete, setDateToDelete] = useState<string | null>(null);
+  }, [location.state, location.pathname, navigate, setStartMonth, setEndMonth]);
 
   /**
-   * Check if app is configured on mount - redirect to setup if not
-   */
-  useEffect(() => {
-    async function checkConfig() {
-      try {
-        const config = await getConfig();
-        // If no config exists, redirect to setup
-        if (!config) {
-          navigate('/setup', { replace: true });
-          return;
-        }
-      } catch (err) {
-        // If we can't check config, still show dashboard (fail open)
-        console.error('Failed to check config:', err);
-      } finally {
-        setCheckingConfig(false);
-      }
-    }
-
-    checkConfig();
-  }, [navigate]);
-
-  /**
-   * Load dashboard transform settings on mount
-   */
-  useEffect(() => {
-    async function loadTransform() {
-      try {
-        const savedTransform = await getDashboardTransform();
-        setTransform(savedTransform);
-      } catch (err) {
-        console.error('Failed to load dashboard transform:', err);
-        // Keep default values on error
-      }
-    }
-
-    loadTransform();
-  }, []);
-
-  /**
-   * Initialize default date range on mount (last 12 months)
-   */
-  useEffect(() => {
-    const now = new Date();
-    const endStr = now.toISOString().slice(0, 7); // YYYY-MM format
-    const start = new Date(now.setFullYear(now.getFullYear() - 1));
-    const startStr = start.toISOString().slice(0, 7);
-
-    setStartMonth(startStr);
-    setEndMonth(endStr);
-  }, []);
-
-  /**
-   * Fetch meter readings and calculation data when date filters change
-   * Calculations are fetched for the chart to ensure correct consumption values (including reset handling)
-   */
-  useEffect(() => {
-    if (!startMonth || !endMonth) return;
-
-    async function fetchData() {
-      setLoadingReadings(true);
-      setError(null);
-
-      try {
-        // Fetch readings for data tables (Electricity/Water/Gas tabs)
-        const [elecData, waterDataResult, gasDataResult] = await Promise.all([
-          getElectricityReadings({ start: startMonth, end: endMonth }),
-          getWaterReadings({ start: startMonth, end: endMonth }),
-          getGasReadings({ start: startMonth, end: endMonth }),
-        ]);
-
-        setElectricityData(elecData);
-        setWaterData(waterDataResult);
-        setGasData(gasDataResult);
-
-        // Fetch calculations for the chart (correct consumption with reset handling)
-        const [elecCalc, waterCalc, gasCalc] = await Promise.all([
-          getElectricityCalculations({ start: startMonth, end: endMonth }),
-          getWaterCalculations({ start: startMonth, end: endMonth }),
-          getGasCalculations({ start: startMonth, end: endMonth }),
-        ]);
-
-        setElecCalcData(elecCalc);
-        setWaterCalcData(waterCalc);
-        setGasCalcData(gasCalc);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch data');
-      } finally {
-        setLoadingReadings(false);
-      }
-    }
-
-    fetchData();
-  }, [startMonth, endMonth]);
-
-  /**
-   * Fetch calculation data only when Calc tab becomes active and we don't have data yet
-   * This avoids unnecessary API calls for unused tabs
-   */
-  useEffect(() => {
-    if (activeTab !== 'calc') return;
-    
-    // Skip if we already have calculation data (fetched during initial load)
-    if (elecCalcData.periods.length > 0 || waterCalcData.periods.length > 0 || gasCalcData.periods.length > 0) {
-      return;
-    }
-
-    async function fetchCalculations() {
-      setLoadingCalculations(true);
-      setError(null);
-
-      try {
-        const [elecCalc, waterCalc, gasCalc] = await Promise.all([
-          getElectricityCalculations({ start: startMonth, end: endMonth }),
-          getWaterCalculations({ start: startMonth, end: endMonth }),
-          getGasCalculations({ start: startMonth, end: endMonth }),
-        ]);
-
-        setElecCalcData(elecCalc);
-        setWaterCalcData(waterCalc);
-        setGasCalcData(gasCalc);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch calculations');
-      } finally {
-        setLoadingCalculations(false);
-      }
-    }
-
-    fetchCalculations();
-  }, [activeTab, startMonth, endMonth, elecCalcData.periods.length, waterCalcData.periods.length, gasCalcData.periods.length]);
-
-  /**
-   * Reset filters to default (last 12 months)
-   */
-  const handleResetFilters = () => {
-    const now = new Date();
-    const endStr = now.toISOString().slice(0, 7);
-    const start = new Date(now.setFullYear(now.getFullYear() - 1));
-    const startStr = start.toISOString().slice(0, 7);
-
-    setStartMonth(startStr);
-    setEndMonth(endStr);
-  };
-
-  /**
-   * Handle edit action - navigate to edit route
+   * Navigate to edit page for a specific date
+   * Passes return period for navigation back to dashboard
    */
   const handleEdit = (date: string) => {
     navigate(`/edit?date=${date}`, { state: { returnPeriod: startMonth || endMonth } });
   };
 
   /**
-   * Handle delete action - open confirmation dialog
+   * Open delete confirmation dialog
    */
   const handleDeleteClick = (date: string) => {
     setDateToDelete(date);
     setDeleteDialogOpen(true);
   };
 
-  /**
-   * Handle confirmed delete action
-   */
-  const handleDeleteConfirm = async () => {
-    if (!dateToDelete) return;
-
-    try {
-      await deleteReadingsByDate(dateToDelete);
-      setSuccessMessage('Readings deleted successfully');
-      setDeleteDialogOpen(false);
-      setDateToDelete(null);
-
-      // Refresh data
-      const [elecData, waterDataResult, gasDataResult] = await Promise.all([
-        getElectricityReadings({ start: startMonth, end: endMonth }),
-        getWaterReadings({ start: startMonth, end: endMonth }),
-        getGasReadings({ start: startMonth, end: endMonth }),
-      ]);
-
-      setElectricityData(elecData);
-      setWaterData(waterDataResult);
-      setGasData(gasDataResult);
-
-      // Clear success message after 3 seconds
-      setTimeout(() => {
-        setSuccessMessage(null);
-      }, 3000);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete readings');
-      setDeleteDialogOpen(false);
-    }
-  };
-
-  /**
-   * Handle cancel delete
-   */
-  const handleDeleteCancel = () => {
-    setDeleteDialogOpen(false);
-    setDateToDelete(null);
-  };
-
-  /**
-   * Handle scale factor changes
-   */
-  const handleTransformChange = async (type: 'electricity_scale' | 'gas_scale' | 'water_scale', value: string) => {
-    const numValue = parseFloat(value);
-    if (isNaN(numValue) || numValue < 0) return;
-
-    const newTransform = { ...transform, [type]: numValue };
-    setTransform(newTransform);
-
-    try {
-      await saveDashboardTransform(newTransform);
-    } catch (err) {
-      console.error('Failed to save transform:', err);
-    }
-  };
-
-  /**
-   * Handle offset changes
-   */
-  const handleOffsetChange = async (type: 'electricity_offset' | 'gas_offset' | 'water_offset', value: string) => {
-    const numValue = parseFloat(value);
-    if (isNaN(numValue)) return;
-
-    const newTransform = { ...transform, [type]: numValue };
-    setTransform(newTransform);
-
-    try {
-      await saveDashboardTransform(newTransform);
-    } catch (err) {
-      console.error('Failed to save offset:', err);
-    }
-  };
-
-  /**
-   * Render the appropriate content based on active tab
-   */
-  const renderTabContent = () => {
-    // Show skeleton while loading
-    if (activeTab === 'calc' && loadingCalculations) {
-      return <ContentSkeleton />;
-    }
-
-    if (activeTab !== 'calc' && loadingReadings) {
-      return <ContentSkeleton />;
-    }
-
-    // Render content based on active tab
-    switch (activeTab) {
-      case 'consumption':
-        return (
-          <ConsumptionChart
-            electricityData={elecCalcData}
-            waterData={waterCalcData}
-            gasData={gasCalcData}
-            cumulatedWater={cumulatedWater}
-            transform={transform}
-          />
-        );
-
-      case 'calc':
-        return (
-          <CalculationTables
-            electricityData={elecCalcData}
-            waterData={waterCalcData}
-            gasData={gasCalcData}
-          />
-        );
-
-      case 'electricity':
-        return (
-          <MeterDataTable
-            data={electricityData}
-            type="electricity"
-            showActions={true}
-            onEdit={handleEdit}
-            onDelete={handleDeleteClick}
-          />
-        );
-
-      case 'water':
-        return (
-          <MeterDataTable
-            data={waterData}
-            type="water"
-            showActions={true}
-            onEdit={handleEdit}
-            onDelete={handleDeleteClick}
-          />
-        );
-
-      case 'gas':
-        return (
-          <MeterDataTable
-            data={gasData}
-            type="gas"
-            showActions={true}
-            onEdit={handleEdit}
-            onDelete={handleDeleteClick}
-          />
-        );
-
-      default:
-        return null;
-    }
-  };
-
-  // Show loading screen while checking config
+  // Show loading spinner while checking if app is configured
   if (checkingConfig) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -564,98 +122,18 @@ export default function Dashboard() {
         {/* Filter Section */}
         <Card className="mb-6">
           <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-end">
-            {/* Start Month Input */}
-            <div className="w-full sm:flex-1 min-w-0">
-              <label
-                htmlFor="start-month"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                Start Month
-              </label>
-              <div className="relative">
-                {isFirefox ? (
-                  <input
-                    type="date"
-                    id="start-month"
-                    ref={startMonthRef}
-                    value={startMonth ? `${startMonth}-01` : ''}
-                    onChange={(e) => {
-                      const dateValue = e.target.value;
-                      if (dateValue) {
-                        const [year, month] = dateValue.split('-');
-                        setStartMonth(`${year}-${month}`);
-                      } else {
-                        setStartMonth('');
-                      }
-                    }}
-                    className="w-full max-w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none cursor-pointer"
-                    style={{ WebkitAppearance: 'none' }}
-                  />
-                ) : (
-                  <input
-                    type="month"
-                    id="start-month"
-                    ref={startMonthRef}
-                    value={startMonth}
-                    onChange={(e) => setStartMonth(e.target.value)}
-                    className="w-full max-w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none cursor-pointer"
-                    style={{ WebkitAppearance: 'none' }}
-                  />
-                )}
-                <div
-                  className="absolute inset-0 cursor-pointer sm:block hidden"
-                  onClick={() => startMonthRef.current?.showPicker?.()}
-                  style={{ zIndex: 10 }}
-                />
-              </div>
-            </div>
-
-            {/* End Month Input */}
-            <div className="w-full sm:flex-1 min-w-0">
-              <label
-                htmlFor="end-month"
-                className="block text-sm font-medium text-gray-700 mb-1"
-              >
-                End Month
-              </label>
-              <div className="relative">
-                {isFirefox ? (
-                  <input
-                    type="date"
-                    id="end-month"
-                    ref={endMonthRef}
-                    value={endMonth ? `${endMonth}-01` : ''}
-                    onChange={(e) => {
-                      const dateValue = e.target.value;
-                      if (dateValue) {
-                        const [year, month] = dateValue.split('-');
-                        setEndMonth(`${year}-${month}`);
-                      } else {
-                        setEndMonth('');
-                      }
-                    }}
-                    className="w-full max-w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none cursor-pointer"
-                    style={{ WebkitAppearance: 'none' }}
-                  />
-                ) : (
-                  <input
-                    type="month"
-                    id="end-month"
-                    ref={endMonthRef}
-                    value={endMonth}
-                    onChange={(e) => setEndMonth(e.target.value)}
-                    className="w-full max-w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 appearance-none cursor-pointer"
-                    style={{ WebkitAppearance: 'none' }}
-                  />
-                )}
-                <div
-                  className="absolute inset-0 cursor-pointer sm:block hidden"
-                  onClick={() => endMonthRef.current?.showPicker?.()}
-                  style={{ zIndex: 10 }}
-                />
-              </div>
-            </div>
-
+            <MonthFilterInput
+              id="start-month"
+              label="Start Month"
+              value={startMonth}
+              onChange={setStartMonth}
+            />
+            <MonthFilterInput
+              id="end-month"
+              label="End Month"
+              value={endMonth}
+              onChange={setEndMonth}
+            />
             {/* Action buttons */}
             <div className="flex gap-2 w-full sm:w-auto mt-2 sm:mt-0">
               <Button
@@ -676,7 +154,7 @@ export default function Dashboard() {
           </div>
         </Card>
 
-        {/* Action Buttons - directly on gray background */}
+        {/* Action Buttons */}
         <div className="flex justify-end gap-3 mt-4 mb-6">
           <button
             onClick={() => navigate('/add')}
@@ -751,7 +229,21 @@ export default function Dashboard() {
 
           {/* Tab Content */}
           <div className="dashboard-content border-t border-gray-300 pt-6 overflow-x-auto">
-            {renderTabContent()}
+            <TabContent
+              activeTab={activeTab}
+              loadingReadings={loadingReadings}
+              loadingCalculations={loadingCalculations}
+              elecCalcData={elecCalcData}
+              waterCalcData={waterCalcData}
+              gasCalcData={gasCalcData}
+              electricityData={electricityData}
+              waterData={waterData}
+              gasData={gasData}
+              cumulatedWater={cumulatedWater}
+              transform={transform}
+              onEdit={handleEdit}
+              onDelete={handleDeleteClick}
+            />
           </div>
         </Card>
       </main>
