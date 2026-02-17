@@ -3,13 +3,14 @@
  * 
  * Provides a global toast notification system with:
  * - Multiple toast types: success, error, info
- * - Auto-dismiss after 5 seconds (except errors)
+ * - Auto-dismiss after 5 seconds (except errors) - managed by Toast component
  * - Manual close via X button or click (success/info only)
+ * - Hover pauses auto-dismiss, leaving resets the timer
  * - Stacked toast support
  * - Responsive positioning (mobile: full-width top, desktop: top-right)
  */
 
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 import { ToastComponent } from './index';
 
 export type ToastType = 'success' | 'error' | 'info';
@@ -31,30 +32,12 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | undefined>(undefined);
 
-const AUTO_DISMISS_DELAY = 5000; // 5 seconds
-
-// Internal ToastContainer component that uses the context
-function ToastContainer() {
-  const context = useContext(ToastContext);
-  if (!context) return null;
-  
-  // We need to access toasts from the provider's internal state
-  // Since we can't access state directly from context value,
-  // we'll use a different approach - the container will be rendered inside the provider
-  return null;
-}
+export const AUTO_DISMISS_DELAY = 5000; // 5 seconds
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
-  const timeoutsRef = useRef<Record<string, NodeJS.Timeout>>({});
 
   const removeToast = useCallback((id: string) => {
-    // Clear any existing timeout for this toast
-    if (timeoutsRef.current[id]) {
-      clearTimeout(timeoutsRef.current[id]);
-      delete timeoutsRef.current[id];
-    }
-    
     setToasts(prev => prev.filter(toast => toast.id !== id));
   }, []);
 
@@ -69,15 +52,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
 
     setToasts(prev => [...prev, newToast]);
 
-    // Auto-dismiss after delay for success and info (not errors)
-    if (type !== 'error') {
-      timeoutsRef.current[id] = setTimeout(() => {
-        removeToast(id);
-      }, AUTO_DISMISS_DELAY);
-    }
-
     return id;
-  }, [removeToast]);
+  }, []);
 
   const success = useCallback((message: string) => {
     addToast('success', message);

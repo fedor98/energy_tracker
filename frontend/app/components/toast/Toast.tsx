@@ -1,18 +1,24 @@
 /**
  * Toast Component - Individual Toast Notification
- * 
+ *
  * Features:
  * - Slide-in animation from top
  * - Different styling for success, error, and info types
+ * - Auto-dismiss with hover pause and reset on leave (Option 2)
+ *   - Success/Info: Auto-dismiss after 5 seconds
+ *   - Hover pauses the timer
+ *   - Leaving resets the timer to full 5 seconds
+ *   - Error: No auto-dismiss
  * - Close behavior:
  *   - Success/Info: Click anywhere on toast to close, or X button
  *   - Error: Only X button closes (no click-to-close)
  * - CheckCircle icon for success, XCircle for error, Info for info
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { CheckCircle, XCircle, Info, X } from 'lucide-react';
 import type { ToastType } from './ToastContext';
+import { AUTO_DISMISS_DELAY } from './ToastContext';
 
 interface ToastProps {
   id: string;
@@ -51,14 +57,54 @@ export function Toast({ id, type, message, onClose }: ToastProps) {
   const config = toastConfig[type];
   const Icon = config.Icon;
 
-  // Trigger enter animation after mount
+  // Auto-dismiss timer ref
+  const dismissTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isPausedRef = useRef(false);
+
+  // Start auto-dismiss timer (for success and info only)
+  const startDismissTimer = useCallback(() => {
+    // Only auto-dismiss for success and info, not errors
+    if (type === 'error') return;
+
+    // Clear any existing timer first
+    if (dismissTimerRef.current) {
+      clearTimeout(dismissTimerRef.current);
+    }
+
+    // Start new timer with full delay (Option 2: reset on leave)
+    dismissTimerRef.current = setTimeout(() => {
+      if (!isPausedRef.current) {
+        handleClose();
+      }
+    }, AUTO_DISMISS_DELAY);
+  }, [type]);
+
+  // Clear auto-dismiss timer
+  const clearDismissTimer = useCallback(() => {
+    if (dismissTimerRef.current) {
+      clearTimeout(dismissTimerRef.current);
+      dismissTimerRef.current = null;
+    }
+  }, []);
+
+  // Trigger enter animation after mount and start dismiss timer
   useEffect(() => {
     const timer = setTimeout(() => setIsVisible(true), 10);
-    return () => clearTimeout(timer);
-  }, []);
+
+    // Start auto-dismiss timer for non-error toasts
+    if (type !== 'error') {
+      startDismissTimer();
+    }
+
+    return () => {
+      clearTimeout(timer);
+      clearDismissTimer();
+    };
+  }, [type, startDismissTimer, clearDismissTimer]);
 
   const handleClose = () => {
     setIsLeaving(true);
+    clearDismissTimer();
     // Wait for exit animation to complete before calling onClose
     setTimeout(() => {
       onClose();
@@ -69,6 +115,22 @@ export function Toast({ id, type, message, onClose }: ToastProps) {
     // Only allow click-to-close for success and info, not errors
     if (type !== 'error') {
       handleClose();
+    }
+  };
+
+  const handleMouseEnter = () => {
+    // Pause the timer when hovering
+    if (type !== 'error') {
+      isPausedRef.current = true;
+      clearDismissTimer();
+    }
+  };
+
+  const handleMouseLeave = () => {
+    // Resume timer (reset to full duration) when leaving (Option 2)
+    if (type !== 'error') {
+      isPausedRef.current = false;
+      startDismissTimer();
     }
   };
 
@@ -84,6 +146,8 @@ export function Toast({ id, type, message, onClose }: ToastProps) {
       `}
       role="alert"
       onClick={handleClick}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       <Icon className={`w-5 h-5 flex-shrink-0 mt-0.5 ${config.iconColor}`} />
       <p className={`flex-1 text-sm font-medium ${config.textColor}`}>
