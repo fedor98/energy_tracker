@@ -16,7 +16,8 @@
  */
 
 import { useState } from 'react';
-import { ChevronRight, ChevronDown, Zap, Flame, Droplets } from 'lucide-react';
+import { ChevronRight, ChevronDown } from 'lucide-react';
+import { ElectricityIcon, GasIcon, WaterIcon } from './icons/MeterIcons';
 import type { DashboardTransform } from '../lib/api';
 
 interface DashboardTransformControlsProps {
@@ -59,13 +60,13 @@ export function DashboardTransformControls({
           <div className="flex items-center pl-14">
             <div className="flex items-center gap-3">
               <div className="w-16 flex justify-center">
-                <Zap size={16} className="text-yellow-500" />
+                <ElectricityIcon size={16} />
               </div>
               <div className="w-16 flex justify-center">
-                <Flame size={16} className="text-green-500" />
+                <GasIcon size={16} />
               </div>
               <div className="w-16 flex justify-center">
-                <Droplets size={16} className="text-blue-500" />
+                <WaterIcon size={16} />
               </div>
             </div>
           </div>
