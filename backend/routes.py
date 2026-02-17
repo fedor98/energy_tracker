@@ -393,14 +393,26 @@ def get_readings_for_date(date: str, is_reset: Optional[bool] = Query(None)):
 
 
 @router.get("/readings/by-date/{date}/count")
-def count_readings_for_date(date: str, is_reset: Optional[bool] = Query(None)):
+def count_readings_for_date(
+    date: str,
+    is_reset: Optional[bool] = Query(None),
+    meter_type: Optional[str] = Query(None),
+    meter_id: Optional[str] = Query(None)
+):
     """
     Count readings for a specific date by type.
+    
+    Args:
+        date: Date in YYYY-MM-DD format
+        is_reset: If True, only count reset readings. If False, exclude reset readings.
+        meter_type: If specified ('electricity', 'water', 'gas'), only count that type.
+                    If None, count all types.
+        meter_id: If specified with meter_type, only count readings for that specific meter.
     
     Returns counts for electricity, water, gas, and total.
     """
     try:
-        counts = count_readings_by_date(date, is_reset)
+        counts = count_readings_by_date(date, is_reset, meter_type, meter_id)
         return counts
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to count readings: {str(e)}")
@@ -455,18 +467,26 @@ def update_readings_for_date(date: str, request: UpdateReadingsByDateRequest):
 
 
 @router.delete("/readings/by-date/{date}")
-def delete_readings_for_date(date: str, is_reset: Optional[bool] = Query(None)):
+def delete_readings_for_date(
+    date: str,
+    is_reset: Optional[bool] = Query(None),
+    meter_type: Optional[str] = Query(None),
+    meter_id: Optional[str] = Query(None)
+):
     """
     Delete all readings for a specific date.
 
     Args:
         date: Date in YYYY-MM-DD format
         is_reset: If True, only delete reset readings. If False, exclude reset readings.
+        meter_type: If specified ('electricity', 'water', 'gas'), only delete that type.
+                    If None, delete all types.
+        meter_id: If specified with meter_type, only delete readings for that specific meter.
 
     Returns counts of deleted readings by type.
     """
     try:
-        result = delete_readings_by_date(date, is_reset)
+        result = delete_readings_by_date(date, is_reset, meter_type, meter_id)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to delete readings: {str(e)}")

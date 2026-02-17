@@ -7,6 +7,7 @@ export interface ElectricityReading {
   id: number;
   date: string;
   meter_name: string;
+  meter_id: string;
   value: number;
   period: string;
   consumption?: number;
@@ -19,6 +20,7 @@ export interface WaterReading {
   id: number;
   date: string;
   room: string;
+  meter_id: string;
   value: number;
   is_warm_water: boolean;
   period: string;
@@ -34,6 +36,7 @@ export interface GasReading {
   id: number;
   date: string;
   room: string;
+  meter_id: string;
   value: number;
   period: string;
   consumption?: number;
@@ -463,10 +466,14 @@ export async function getReadingsByDate(
 
 export async function countReadingsByDate(
   date: string,
-  isReset?: boolean
+  isReset?: boolean,
+  meterType?: 'electricity' | 'water' | 'gas',
+  meterId?: string
 ): Promise<ReadingCounts> {
   const query = new URLSearchParams();
   if (isReset !== undefined) query.append('is_reset', String(isReset));
+  if (meterType) query.append('meter_type', meterType);
+  if (meterId) query.append('meter_id', meterId);
   const res = await fetch(`${API_BASE}/readings/by-date/${date}/count?${query.toString()}`);
   if (!res.ok) throw new Error('Failed to count readings for date');
   return res.json();
@@ -496,10 +503,14 @@ export async function updateReadingsByDate(
 
 export async function deleteReadingsByDate(
   date: string,
-  isReset?: boolean
+  isReset?: boolean,
+  meterType?: 'electricity' | 'water' | 'gas',
+  meterId?: string
 ): Promise<DeleteReadingsResponse> {
   const query = new URLSearchParams();
   if (isReset !== undefined) query.append('is_reset', String(isReset));
+  if (meterType) query.append('meter_type', meterType);
+  if (meterId) query.append('meter_id', meterId);
   const res = await fetch(`${API_BASE}/readings/by-date/${date}?${query.toString()}`, {
     method: 'DELETE'
   });

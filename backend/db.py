@@ -1728,9 +1728,22 @@ def get_readings_by_date(date: str, is_reset: Optional[bool] = None) -> Dict[str
     }
 
 
-def count_readings_by_date(date: str, is_reset: Optional[bool] = None) -> Dict[str, Any]:
+def count_readings_by_date(
+    date: str,
+    is_reset: Optional[bool] = None,
+    meter_type: Optional[str] = None,
+    meter_id: Optional[str] = None
+) -> Dict[str, Any]:
     """
     Count readings for a specific date by type.
+    
+    Args:
+        date: Date in YYYY-MM-DD format
+        is_reset: If True, only count reset readings. If False, exclude reset readings.
+                  If None, count all readings.
+        meter_type: If specified ('electricity', 'water', 'gas'), only count that type.
+                    If None, count all types.
+        meter_id: If specified with meter_type, only count readings for that specific meter.
     
     Returns:
         Dictionary with counts for each type and total
@@ -1738,42 +1751,58 @@ def count_readings_by_date(date: str, is_reset: Optional[bool] = None) -> Dict[s
     conn = get_db_connection()
     c = conn.cursor()
     
-    # Build WHERE clause for is_reset filter
+    # Build WHERE clause for filters
     reset_filter = ""
+    meter_filter = ""
     params: List[Any] = [f"{date}%"]
     
     if is_reset is not None:
         reset_filter = " AND is_reset = ?"
         params.append(1 if is_reset else 0)
     
-    # Count electricity readings
-    c.execute(f'''
-        SELECT COUNT(*) FROM readings_electricity
-        WHERE date LIKE ?{reset_filter}
-    ''', params)
-    electricity_count = c.fetchone()[0]
+    if meter_id is not None:
+        meter_filter = " AND meter_id = ?"
+        params.append(meter_id)
     
-    # Count water readings
-    params_water: List[Any] = [f"{date}%"]
-    if is_reset is not None:
-        params_water.append(1 if is_reset else 0)
+    # Count readings based on meter_type filter
+    if meter_type is None or meter_type == 'electricity':
+        c.execute(f'''
+            SELECT COUNT(*) FROM readings_electricity
+            WHERE date LIKE ?{reset_filter}{meter_filter}
+        ''', params)
+        electricity_count = c.fetchone()[0]
+    else:
+        electricity_count = 0
     
-    c.execute(f'''
-        SELECT COUNT(*) FROM readings_water
-        WHERE date LIKE ?{reset_filter}
-    ''', params_water)
-    water_count = c.fetchone()[0]
+    if meter_type is None or meter_type == 'water':
+        params_water: List[Any] = [f"{date}%"]
+        if is_reset is not None:
+            params_water.append(1 if is_reset else 0)
+        if meter_id is not None:
+            params_water.append(meter_id)
+        
+        c.execute(f'''
+            SELECT COUNT(*) FROM readings_water
+            WHERE date LIKE ?{reset_filter}{meter_filter}
+        ''', params_water)
+        water_count = c.fetchone()[0]
+    else:
+        water_count = 0
     
-    # Count gas readings
-    params_gas: List[Any] = [f"{date}%"]
-    if is_reset is not None:
-        params_gas.append(1 if is_reset else 0)
-    
-    c.execute(f'''
-        SELECT COUNT(*) FROM readings_gas
-        WHERE date LIKE ?{reset_filter}
-    ''', params_gas)
-    gas_count = c.fetchone()[0]
+    if meter_type is None or meter_type == 'gas':
+        params_gas: List[Any] = [f"{date}%"]
+        if is_reset is not None:
+            params_gas.append(1 if is_reset else 0)
+        if meter_id is not None:
+            params_gas.append(meter_id)
+        
+        c.execute(f'''
+            SELECT COUNT(*) FROM readings_gas
+            WHERE date LIKE ?{reset_filter}{meter_filter}
+        ''', params_gas)
+        gas_count = c.fetchone()[0]
+    else:
+        gas_count = 0
     
     conn.close()
     
@@ -1975,7 +2004,12 @@ def update_readings_by_date(
         conn.close()
 
 
-def delete_readings_by_date(date: str, is_reset: Optional[bool] = None) -> Dict[str, Any]:
+def delete_readings_by_date(
+    date: str,
+    is_reset: Optional[bool] = None,
+    meter_type: Optional[str] = None,
+    meter_id: Optional[str] = None
+) -> Dict[str, Any]:
     """
     Delete all readings for a specific date.
     
@@ -1983,6 +2017,9 @@ def delete_readings_by_date(date: str, is_reset: Optional[bool] = None) -> Dict[
         date: Date in YYYY-MM-DD format
         is_reset: If True, only delete reset readings. If False, exclude reset readings.
                   If None, delete all readings.
+        meter_type: If specified ('electricity', 'water', 'gas'), only delete that type.
+                    If None, delete all types.
+        meter_id: If specified with meter_type, only delete readings for that specific meter.
     
     Returns:
         Dictionary with delete counts
@@ -1992,63 +2029,98 @@ def delete_readings_by_date(date: str, is_reset: Optional[bool] = None) -> Dict[
     
     # Build WHERE clause
     reset_filter = ""
+    meter_filter = ""
     params: List[Any] = [f"{date}%"]
     
     if is_reset is not None:
         reset_filter = " AND is_reset = ?"
         params.append(1 if is_reset else 0)
     
+    if meter_id is not None:
+        meter_filter = " AND meter_id = ?"
+        params.append(meter_id)
+    
     try:
         # Get info before deleting for consumption recalculation
-        c.execute(f'''
-            SELECT DISTINCT meter_name, SUBSTR(date, 1, 7) as period
-            FROM readings_electricity
-            WHERE date LIKE ?{reset_filter}
-        ''', params)
-        elec_meters = c.fetchall()
+        elec_meters = []
+        water_rooms = []
+        gas_rooms = []
         
-        c.execute(f'''
-            SELECT DISTINCT room, SUBSTR(date, 1, 7) as period
-            FROM readings_water
-            WHERE date LIKE ?{reset_filter}
-        ''', params)
-        water_rooms = c.fetchall()
+        if meter_type is None or meter_type == 'electricity':
+            c.execute(f'''
+                SELECT DISTINCT meter_name, SUBSTR(date, 1, 7) as period
+                FROM readings_electricity
+                WHERE date LIKE ?{reset_filter}{meter_filter}
+            ''', params)
+            elec_meters = c.fetchall()
         
-        c.execute(f'''
-            SELECT DISTINCT room, SUBSTR(date, 1, 7) as period
-            FROM readings_gas
-            WHERE date LIKE ?{reset_filter}
-        ''', params)
-        gas_rooms = c.fetchall()
+        if meter_type is None or meter_type == 'water':
+            params_water: List[Any] = [f"{date}%"]
+            if is_reset is not None:
+                params_water.append(1 if is_reset else 0)
+            if meter_id is not None:
+                params_water.append(meter_id)
+            
+            c.execute(f'''
+                SELECT DISTINCT room, SUBSTR(date, 1, 7) as period
+                FROM readings_water
+                WHERE date LIKE ?{reset_filter}{meter_filter}
+            ''', params_water)
+            water_rooms = c.fetchall()
+        
+        if meter_type is None or meter_type == 'gas':
+            params_gas: List[Any] = [f"{date}%"]
+            if is_reset is not None:
+                params_gas.append(1 if is_reset else 0)
+            if meter_id is not None:
+                params_gas.append(meter_id)
+            
+            c.execute(f'''
+                SELECT DISTINCT room, SUBSTR(date, 1, 7) as period
+                FROM readings_gas
+                WHERE date LIKE ?{reset_filter}{meter_filter}
+            ''', params_gas)
+            gas_rooms = c.fetchall()
+        
+        deleted_electricity = 0
+        deleted_water = 0
+        deleted_gas = 0
         
         # Delete electricity readings
-        c.execute(f'''
-            DELETE FROM readings_electricity
-            WHERE date LIKE ?{reset_filter}
-        ''', params)
-        deleted_electricity = c.rowcount
+        if meter_type is None or meter_type == 'electricity':
+            c.execute(f'''
+                DELETE FROM readings_electricity
+                WHERE date LIKE ?{reset_filter}{meter_filter}
+            ''', params)
+            deleted_electricity = c.rowcount
         
         # Delete water readings
-        params_water: List[Any] = [f"{date}%"]
-        if is_reset is not None:
-            params_water.append(1 if is_reset else 0)
-        
-        c.execute(f'''
-            DELETE FROM readings_water
-            WHERE date LIKE ?{reset_filter}
-        ''', params_water)
-        deleted_water = c.rowcount
+        if meter_type is None or meter_type == 'water':
+            params_water: List[Any] = [f"{date}%"]
+            if is_reset is not None:
+                params_water.append(1 if is_reset else 0)
+            if meter_id is not None:
+                params_water.append(meter_id)
+            
+            c.execute(f'''
+                DELETE FROM readings_water
+                WHERE date LIKE ?{reset_filter}{meter_filter}
+            ''', params_water)
+            deleted_water = c.rowcount
         
         # Delete gas readings
-        params_gas: List[Any] = [f"{date}%"]
-        if is_reset is not None:
-            params_gas.append(1 if is_reset else 0)
-        
-        c.execute(f'''
-            DELETE FROM readings_gas
-            WHERE date LIKE ?{reset_filter}
-        ''', params_gas)
-        deleted_gas = c.rowcount
+        if meter_type is None or meter_type == 'gas':
+            params_gas: List[Any] = [f"{date}%"]
+            if is_reset is not None:
+                params_gas.append(1 if is_reset else 0)
+            if meter_id is not None:
+                params_gas.append(meter_id)
+            
+            c.execute(f'''
+                DELETE FROM readings_gas
+                WHERE date LIKE ?{reset_filter}{meter_filter}
+            ''', params_gas)
+            deleted_gas = c.rowcount
         
         # Delete associated consumption calculations
         periods = set()

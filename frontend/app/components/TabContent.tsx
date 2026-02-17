@@ -33,7 +33,7 @@ interface TabContentProps {
   transform: DashboardTransform;
   // Callbacks for meter tables
   onEdit: (date: string) => void;
-  onDelete: (date: string) => void;
+  onDelete: (date: string, meterType: 'electricity' | 'water' | 'gas', meterId: string, meterDisplayName: string, isWarmWater?: boolean) => void;
 }
 
 export function TabContent({

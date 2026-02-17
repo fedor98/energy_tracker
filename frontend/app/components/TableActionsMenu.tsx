@@ -32,11 +32,15 @@ import { MoreVertical, Edit2, Trash2 } from 'lucide-react';
 
 interface TableActionsMenuProps {
   date: string;
+  meterType: 'electricity' | 'water' | 'gas';
+  meterId: string;
+  meterDisplayName: string;
+  isWarmWater?: boolean;
   onEdit: (date: string) => void;
-  onDelete: (date: string) => void;
+  onDelete: (date: string, meterType: 'electricity' | 'water' | 'gas', meterId: string, meterDisplayName: string, isWarmWater?: boolean) => void;
 }
 
-export function TableActionsMenu({ date, onEdit, onDelete }: TableActionsMenuProps) {
+export function TableActionsMenu({ date, meterType, meterId, meterDisplayName, isWarmWater, onEdit, onDelete }: TableActionsMenuProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const { refs, floatingStyles, context } = useFloating({
@@ -74,7 +78,7 @@ export function TableActionsMenu({ date, onEdit, onDelete }: TableActionsMenuPro
 
   const handleDelete = () => {
     setIsOpen(false);
-    onDelete(date);
+    onDelete(date, meterType, meterId, meterDisplayName, isWarmWater);
   };
 
   return (

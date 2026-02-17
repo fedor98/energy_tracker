@@ -18,13 +18,15 @@ interface MeterDataTableProps {
   type: 'electricity' | 'water' | 'gas';
   showActions?: boolean;
   onEdit?: (date: string) => void;
-  onDelete?: (date: string) => void;
+  onDelete?: (date: string, meterType: 'electricity' | 'water' | 'gas', meterId: string, meterDisplayName: string, isWarmWater?: boolean) => void;
 }
 
 interface TableRow {
   id: number;
   date: string;
   displayName: string;
+  meterId: string;
+  meterType: 'electricity' | 'water' | 'gas';
   value: string;
   period: string;
   isReset: boolean;
@@ -34,13 +36,14 @@ interface TableRow {
 const isWaterReading = (r: MeterData): r is WaterReading => 'is_warm_water' in r;
 const isElectricityReading = (r: MeterData): r is ElectricityReading => 'meter_name' in r;
 const getDisplayName = (r: MeterData): string => isElectricityReading(r) ? (r.meter_name || '') : (r.room || '');
+const getMeterId = (r: MeterData): string => r.meter_id;
 const getDatePart = (d: string): string => d.split(' ')[0];
 const formatValue = (v: number | null | undefined): string => v == null ? '-' : v.toFixed(2);
 
 /**
  * Merges reset pairs into single rows. Reset pairs share the same date and meter.
  */
-function mergeResetPairs(data: MeterData[]): TableRow[] {
+function mergeResetPairs(data: MeterData[], type: 'electricity' | 'water' | 'gas'): TableRow[] {
   const result: TableRow[] = [];
   const processed = new Set<number>();
   const unit = data[0] && 'meter_name' in data[0] ? 'kWh' : 'm³';
@@ -52,12 +55,15 @@ function mergeResetPairs(data: MeterData[]): TableRow[] {
     const currentIsReset = current.is_reset === true;
     const currentDate = getDatePart(current.date);
     const currentName = getDisplayName(current);
+    const currentMeterId = getMeterId(current);
 
     if (!currentIsReset) {
       result.push({
         id: current.id,
         date: current.date,
         displayName: currentName,
+        meterId: currentMeterId,
+        meterType: type,
         value: `${formatValue(current.value)} ${unit}`,
         period: current.period,
         isReset: false,
@@ -75,7 +81,8 @@ function mergeResetPairs(data: MeterData[]): TableRow[] {
       const other = data[j];
       if (other.is_reset === true && 
           getDatePart(other.date) === currentDate && 
-          getDisplayName(other) === currentName) {
+          getDisplayName(other) === currentName &&
+          getMeterId(other) === currentMeterId) {
         
         // Determine old/new by time
         const currentTime = current.date.includes(' ') ? current.date.split(' ')[1] : '';
@@ -88,6 +95,8 @@ function mergeResetPairs(data: MeterData[]): TableRow[] {
           id: current.id,
           date: currentDate,
           displayName: currentName,
+          meterId: currentMeterId,
+          meterType: type,
           value: `${formatValue(oldVal)} ${unit} → ${formatValue(newVal)} ${unit}`,
           period: current.period,
           isReset: true,
@@ -106,6 +115,8 @@ function mergeResetPairs(data: MeterData[]): TableRow[] {
         id: current.id,
         date: currentDate,
         displayName: currentName,
+        meterId: currentMeterId,
+        meterType: type,
         value: `${formatValue(current.value)} ${unit}`,
         period: current.period,
         isReset: true,
@@ -147,7 +158,7 @@ function renderTableRow(
   isFirstInMonth: boolean,
   showActions?: boolean,
   onEdit?: (date: string) => void,
-  onDelete?: (date: string) => void
+  onDelete?: (date: string, meterType: 'electricity' | 'water' | 'gas', meterId: string, meterDisplayName: string, isWarmWater?: boolean) => void
 ) {
   const baseCellClass = 'px-4 py-3 text-sm';
   const borderClass = isFirstInMonth ? 'border-t-2 border-gray-300' : '';
@@ -173,7 +184,15 @@ function renderTableRow(
       </td>
       {showActions && onEdit && onDelete && (
         <td className={`${baseCellClass} px-1 text-center ${borderClass}`}>
-          <TableActionsMenu date={row.date} onEdit={onEdit} onDelete={onDelete} />
+          <TableActionsMenu 
+            date={row.date} 
+            meterType={row.meterType}
+            meterId={row.meterId}
+            meterDisplayName={row.displayName}
+            isWarmWater={row.isWarmWater}
+            onEdit={onEdit} 
+            onDelete={onDelete} 
+          />
         </td>
       )}
     </tr>
@@ -196,7 +215,7 @@ export function MeterDataTable({
     );
   }
 
-  const mergedRows = mergeResetPairs(data);
+  const mergedRows = mergeResetPairs(data, type);
   const grouped = groupByPeriod(mergedRows);
   const sortedPeriods = Object.keys(grouped).sort().reverse();
 

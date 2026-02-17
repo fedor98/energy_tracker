@@ -45,11 +45,13 @@ export default function Dashboard() {
     error,
     deleteDialogOpen,
     dateToDelete,
+    meterToDelete,
     transform,
     setStartMonth,
     setEndMonth,
     setDeleteDialogOpen,
     setDateToDelete,
+    setMeterToDelete,
     handleResetFilters,
     handleDeleteConfirm,
     handleDeleteCancel,
@@ -80,10 +82,11 @@ export default function Dashboard() {
   };
 
   /**
-   * Open delete confirmation dialog
+   * Open delete confirmation dialog with meter information
    */
-  const handleDeleteClick = (date: string) => {
+  const handleDeleteClick = (date: string, meterType: 'electricity' | 'water' | 'gas', meterId: string, meterDisplayName: string, isWarmWater?: boolean) => {
     setDateToDelete(date);
+    setMeterToDelete({ type: meterType, id: meterId, displayName: meterDisplayName, isWarmWater });
     setDeleteDialogOpen(true);
   };
 
@@ -181,6 +184,10 @@ export default function Dashboard() {
         {/* Delete Confirmation Dialog */}
         <DeleteConfirmationDialog
           date={dateToDelete || ''}
+          meterType={meterToDelete?.type || 'electricity'}
+          meterId={meterToDelete?.id || ''}
+          meterDisplayName={meterToDelete?.displayName || ''}
+          isWarmWater={meterToDelete?.isWarmWater}
           isOpen={deleteDialogOpen}
           onClose={handleDeleteCancel}
           onConfirm={handleDeleteConfirm}

@@ -105,6 +105,12 @@ export function useDashboardData(navigate: (path: string, options?: { replace?: 
   // Delete dialog state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [dateToDelete, setDateToDelete] = useState<string | null>(null);
+  const [meterToDelete, setMeterToDelete] = useState<{
+    type: 'electricity' | 'water' | 'gas';
+    id: string;
+    displayName: string;
+    isWarmWater?: boolean;
+  } | null>(null);
 
   // Transform settings
   const [transform, setTransform] = useState<DashboardTransform>(defaultTransform);
@@ -221,18 +227,26 @@ export function useDashboardData(navigate: (path: string, options?: { replace?: 
   }, []);
 
   /**
-   * Handle confirmed delete action
-   * Deletes readings for the selected date and refreshes the data
+   * Handle confirmed delete action with scope
+   * Deletes readings based on selected scope and refreshes the data
    * Shows success toast notification
    */
-  const handleDeleteConfirm = useCallback(async () => {
+  const handleDeleteConfirm = useCallback(async (scope: 'all' | 'energy_type' | 'meter') => {
     if (!dateToDelete) return;
 
     try {
-      await deleteReadingsByDate(dateToDelete);
+      if (scope === 'all') {
+        await deleteReadingsByDate(dateToDelete);
+      } else if (scope === 'energy_type' && meterToDelete) {
+        await deleteReadingsByDate(dateToDelete, undefined, meterToDelete.type);
+      } else if (scope === 'meter' && meterToDelete) {
+        await deleteReadingsByDate(dateToDelete, undefined, meterToDelete.type, meterToDelete.id);
+      }
+      
       toast.success('Readings deleted successfully');
       setDeleteDialogOpen(false);
       setDateToDelete(null);
+      setMeterToDelete(null);
 
       // Refresh all meter data after deletion
       const [elecData, waterDataResult, gasDataResult] = await Promise.all([
@@ -248,7 +262,7 @@ export function useDashboardData(navigate: (path: string, options?: { replace?: 
       toast.error(err instanceof Error ? err.message : 'Failed to delete readings');
       setDeleteDialogOpen(false);
     }
-  }, [dateToDelete, startMonth, endMonth, toast]);
+  }, [dateToDelete, meterToDelete, startMonth, endMonth, toast]);
 
   /**
    * Handle cancel delete action
@@ -257,6 +271,7 @@ export function useDashboardData(navigate: (path: string, options?: { replace?: 
   const handleDeleteCancel = useCallback(() => {
     setDeleteDialogOpen(false);
     setDateToDelete(null);
+    setMeterToDelete(null);
   }, []);
 
   /**
@@ -319,6 +334,7 @@ export function useDashboardData(navigate: (path: string, options?: { replace?: 
     error,
     deleteDialogOpen,
     dateToDelete,
+    meterToDelete,
     transform,
     
     // Setters
@@ -326,6 +342,7 @@ export function useDashboardData(navigate: (path: string, options?: { replace?: 
     setEndMonth,
     setDeleteDialogOpen,
     setDateToDelete,
+    setMeterToDelete,
     setError,
     
     // Actions
